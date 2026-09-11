@@ -2,7 +2,7 @@ config {
   type: "view",
   schema: dataform.projectConfig.vars.reporting_dataset,
   tags: ["billing_platform"],
-  description: "1 linha: KPIs do mes corrente (MTD) + mes anterior fechado + orcamento. Serve o scorecard da Visao geral."
+  description: "1 linha: KPIs do mes corrente (MTD) + mes anterior fechado + orcamento, conta inteira. Serve o scorecard da Visao geral. Sem quebra por project_id de proposito — e um card de 1 linha; um scorecard por projeto e um filtro futuro na API/UI, nao uma mudanca de grao aqui."
 }
 
 js { const c = require("includes/constants"); }

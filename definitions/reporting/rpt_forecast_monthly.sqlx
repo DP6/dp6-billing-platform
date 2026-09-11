@@ -2,7 +2,7 @@ config {
   type: "view",
   schema: dataform.projectConfig.vars.reporting_dataset,
   tags: ["billing_platform"],
-  description: "Historico mensal + previsao linear dos proximos 3 meses com faixa. Historico curto (3 meses, 1 atipico) -> faixa larga de proposito; recalibra sozinha conforme cresce."
+  description: "Historico mensal + previsao linear dos proximos 3 meses com faixa, conta inteira. Historico curto -> faixa larga de proposito; recalibra sozinha conforme cresce. Sem project_id de proposito — regressao por projeto exigiria historico proprio por projeto (ainda mais curto); revisitar so depois da Fase 1 confirmar volume suficiente por projeto."
 }
 
 WITH hist AS (

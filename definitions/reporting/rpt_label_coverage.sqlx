@@ -2,11 +2,13 @@ config {
   type: "view",
   schema: dataform.projectConfig.vars.reporting_dataset,
   tags: ["billing_platform"],
-  description: "Cobertura de label por invoice_month (fracao do custo liquido com cada chave preenchida). Serve os donuts da aba Alocacao."
+  description: "Cobertura de label por invoice_month x project_id (fracao do custo liquido com cada chave preenchida). Serve os donuts da aba Alocacao — quebra por projeto ajuda a achar quem nao esta taggeando."
 }
 
 SELECT
   invoice_month,
+  project_id,
+  ANY_VALUE(project_name)                                               AS project_name,
   SUM(net_cost_brl)                                                     AS net_cost_total_brl,
   SUM(IF(label_environment IS NOT NULL, net_cost_brl, 0))               AS net_cost_with_environment_brl,
   SUM(IF(label_app IS NOT NULL, net_cost_brl, 0))                       AS net_cost_with_app_brl,
@@ -16,4 +18,4 @@ SELECT
   SAFE_DIVIDE(SUM(IF(label_managed_by IS NOT NULL, net_cost_brl, 0)),  NULLIF(SUM(net_cost_brl), 0)) AS pct_managed_by,
   SUM(IF(label_app IS NULL AND label_environment IS NULL, net_cost_brl, 0)) AS unallocated_net_cost_brl
 FROM ${ref("fct_billing_cost_daily")}
-GROUP BY invoice_month
+GROUP BY invoice_month, project_id

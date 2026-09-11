@@ -2,7 +2,7 @@ config {
   type: "view",
   schema: dataform.projectConfig.vars.reporting_dataset,
   tags: ["billing_platform"],
-  description: "1 linha: fracao do gasto elegivel coberta por CUD. 0 nesta conta (validation #03 -> so DISCOUNT spend-based). Serve o gauge da aba Otimizacao."
+  description: "1 linha: fracao do gasto elegivel coberta por CUD, conta inteira. 0 no polaris-cost-model (validation #03 -> so DISCOUNT spend-based) — reconfirmar na Fase 1, a conta inteira pode ter CUDs que o projeto sozinho nao tinha. Serve o gauge da aba Otimizacao. Sem project_id de proposito — e um gauge de 1 linha."
 }
 
 js { const c = require("includes/constants"); }

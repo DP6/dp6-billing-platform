@@ -7,6 +7,8 @@ config {
 
 SELECT
   usage_date,
+  project_id,
+  project_name,
   service_description,
   net_cost_day_brl,
   avg_28d_brl,

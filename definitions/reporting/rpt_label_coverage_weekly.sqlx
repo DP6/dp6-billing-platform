@@ -7,9 +7,11 @@ config {
 
 SELECT
   DATE_TRUNC(usage_date, WEEK(MONDAY)) AS week_start,
+  project_id,
+  ANY_VALUE(project_name) AS project_name,
   SAFE_DIVIDE(SUM(IF(label_app IS NOT NULL, net_cost_brl, 0)),         NULLIF(SUM(net_cost_brl), 0)) AS pct_app,
   SAFE_DIVIDE(SUM(IF(label_environment IS NOT NULL, net_cost_brl, 0)), NULLIF(SUM(net_cost_brl), 0)) AS pct_environment,
   SAFE_DIVIDE(SUM(IF(label_managed_by IS NOT NULL, net_cost_brl, 0)),  NULLIF(SUM(net_cost_brl), 0)) AS pct_managed_by,
   SUM(net_cost_brl) AS net_cost_week_brl
 FROM ${ref("fct_billing_cost_daily")}
-GROUP BY week_start
+GROUP BY week_start, project_id

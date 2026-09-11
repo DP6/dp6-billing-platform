@@ -2,7 +2,7 @@ config {
   type: "view",
   schema: dataform.projectConfig.vars.reporting_dataset,
   tags: ["billing_platform"],
-  description: "Dimensao service/sku + custo unitario lifetime + recencia + delta mes a mes (top movers). O custo unitario da janela filtrada a API calcula de rpt_cost_daily."
+  description: "Dimensao service/sku (conta inteira, agregado entre projetos) + custo unitario lifetime + recencia + delta mes a mes (top movers). O custo unitario da janela filtrada a API calcula de rpt_cost_daily (que tem project_id). Sem project_id aqui de proposito — dim_service_sku e um catalogo global de sku; quebrar por projeto duplicaria o catalogo (mesmo sku usado em N projetos) e mudaria o grao desta view."
 }
 
 -- agg_billing_cost_monthly nao tem grao de sku (so service x label x cost_type).

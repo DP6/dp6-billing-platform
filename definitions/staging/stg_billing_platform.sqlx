@@ -62,6 +62,7 @@ SELECT
   sku.id                                              AS sku_id,
   sku.description                                     AS sku_description,
   project.id                                          AS project_id,
+  project.name                                        AS project_name,
   usage_start_time,
   usage_end_time,
   DATE(usage_start_time)                              AS usage_date,

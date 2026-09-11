@@ -2,7 +2,7 @@ config {
   type: "view",
   schema: dataform.projectConfig.vars.reporting_dataset,
   tags: ["billing_platform"],
-  description: "Degraus preco-de-tabela -> desconto negociado -> creditos -> liquido (acumulado). Hoje desconto negociado = 0 (validation #08) — o waterfall prova que nao ha desconto. Serve a aba Unit economics."
+  description: "Degraus preco-de-tabela -> desconto negociado -> creditos -> liquido (acumulado), conta inteira. Herdado do polaris-cost-model (validation #08 la achou desconto negociado = 0 — reconfirmar na Fase 1 pra conta inteira). Serve a aba Unit economics. Sem project_id de proposito — e um waterfall de 1 linha; por projeto seria N waterfalls, decisao de UI futura."
 }
 
 WITH agg AS (

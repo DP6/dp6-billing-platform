@@ -2,7 +2,7 @@ config {
   type: "view",
   schema: dataform.projectConfig.vars.reporting_dataset,
   tags: ["billing_platform"],
-  description: "Burn-down do mes corrente: custo liquido acumulado por dia vs. orcamento e thresholds. Serve o grafico de consumo acumulado da aba Orcamento."
+  description: "Burn-down do mes corrente: custo liquido acumulado por dia vs. orcamento e thresholds, conta inteira. Serve o grafico de consumo acumulado da aba Orcamento. Sem project_id de proposito — o orcamento hoje e um numero unico da conta (MONTHLY_BUDGET_BRL, TBD pos-Fase-1); orcamento por projeto e um conceito que ainda nao existe."
 }
 
 js { const c = require("includes/constants"); }

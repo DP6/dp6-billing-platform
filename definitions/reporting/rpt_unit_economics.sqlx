@@ -2,7 +2,7 @@ config {
   type: "view",
   schema: dataform.projectConfig.vars.reporting_dataset,
   tags: ["billing_platform"],
-  description: "1 linha: custos unitarios (30 dias). cost_per_deploy usa deploy_count de config (specs/003 decisao #3 — nao esta no billing export)."
+  description: "1 linha: custos unitarios (30 dias), conta inteira. cost_per_deploy usa DEPLOY_COUNT_PER_MONTH, que e um placeholder do polaris-cost-model e NAO faz sentido pra conta inteira (ver TODO em includes/constants.js) — cost_per_deploy desta view deve ser tratado como invalido ate essa constante ser revista. Sem project_id de proposito — e um card de 1 linha."
 }
 
 js { const c = require("includes/constants"); }

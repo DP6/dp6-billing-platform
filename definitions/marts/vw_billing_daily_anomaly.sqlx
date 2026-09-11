@@ -2,7 +2,7 @@ config {
   type: "view",
   schema: dataform.projectConfig.vars.mart_dataset,
   tags: ["billing_platform"],
-  description: "z-score do custo liquido diario por servico contra media movel de 28 dias. is_anomaly = z > anomaly_z E net_cost_day > anomaly_min_brl (piso absoluto obrigatorio nessa escala)."
+  description: "z-score do custo liquido diario por projeto x servico contra media movel de 28 dias. is_anomaly = z > anomaly_z E net_cost_day > anomaly_min_brl (piso absoluto obrigatorio nessa escala). Particionado tambem por project_id (nao so servico) porque a conta inteira tem varios projetos — sem isso, um pico num projeto pequeno se dilui na media da conta."
 }
 
 js { const c = require("includes/constants"); }
@@ -10,23 +10,27 @@ js { const c = require("includes/constants"); }
 WITH daily AS (
   SELECT
     usage_date,
+    project_id,
+    ANY_VALUE(project_name) AS project_name,
     service_description,
     SUM(net_cost_brl) AS net_cost_day_brl
   FROM ${ref("fct_billing_cost_daily")}
   WHERE cost_type = 'regular'
-  GROUP BY usage_date, service_description
+  GROUP BY usage_date, project_id, service_description
 ),
 
 windowed AS (
   SELECT
     usage_date,
+    project_id,
+    project_name,
     service_description,
     net_cost_day_brl,
     AVG(net_cost_day_brl) OVER w    AS avg_28d_brl,
     STDDEV_SAMP(net_cost_day_brl) OVER w AS stddev_28d_brl
   FROM daily
   WINDOW w AS (
-    PARTITION BY service_description
+    PARTITION BY project_id, service_description
     ORDER BY UNIX_DATE(usage_date)
     RANGE BETWEEN 28 PRECEDING AND 1 PRECEDING
   )
@@ -34,6 +38,8 @@ windowed AS (
 
 SELECT
   usage_date,
+  project_id,
+  project_name,
   service_description,
   net_cost_day_brl,
   avg_28d_brl,
