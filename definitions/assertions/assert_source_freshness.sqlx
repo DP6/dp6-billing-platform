@@ -1,0 +1,14 @@
+config {
+  type: "assertion",
+  tags: ["billing_platform"],
+  description: "Falha se a ultima linha exportada tiver mais de freshness_threshold_hours (validation #00: normal ~2h; dias de baixa atividade reexportam 1x/dia)."
+}
+
+js { const c = require("includes/constants"); }
+
+SELECT
+  MAX(export_time)                                            AS last_export_time,
+  TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), MAX(export_time), HOUR)  AS hours_stale,
+  ${c.FRESHNESS_HOURS}                                        AS threshold_hours
+FROM ${ref("billing_export_resource")}
+HAVING TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), MAX(export_time), HOUR) > ${c.FRESHNESS_HOURS}

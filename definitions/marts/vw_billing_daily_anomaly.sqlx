@@ -1,0 +1,48 @@
+config {
+  type: "view",
+  schema: dataform.projectConfig.vars.mart_dataset,
+  tags: ["billing_platform"],
+  description: "z-score do custo liquido diario por servico contra media movel de 28 dias. is_anomaly = z > anomaly_z E net_cost_day > anomaly_min_brl (piso absoluto obrigatorio nessa escala)."
+}
+
+js { const c = require("includes/constants"); }
+
+WITH daily AS (
+  SELECT
+    usage_date,
+    service_description,
+    SUM(net_cost_brl) AS net_cost_day_brl
+  FROM ${ref("fct_billing_cost_daily")}
+  WHERE cost_type = 'regular'
+  GROUP BY usage_date, service_description
+),
+
+windowed AS (
+  SELECT
+    usage_date,
+    service_description,
+    net_cost_day_brl,
+    AVG(net_cost_day_brl) OVER w    AS avg_28d_brl,
+    STDDEV_SAMP(net_cost_day_brl) OVER w AS stddev_28d_brl
+  FROM daily
+  WINDOW w AS (
+    PARTITION BY service_description
+    ORDER BY UNIX_DATE(usage_date)
+    RANGE BETWEEN 28 PRECEDING AND 1 PRECEDING
+  )
+)
+
+SELECT
+  usage_date,
+  service_description,
+  net_cost_day_brl,
+  avg_28d_brl,
+  stddev_28d_brl,
+  SAFE_DIVIDE(net_cost_day_brl - avg_28d_brl, NULLIF(stddev_28d_brl, 0)) AS z_score,
+  net_cost_day_brl - avg_28d_brl                                        AS deviation_abs_brl,
+  SAFE_DIVIDE(net_cost_day_brl - avg_28d_brl, NULLIF(avg_28d_brl, 0))   AS deviation_pct,
+  (
+    SAFE_DIVIDE(net_cost_day_brl - avg_28d_brl, NULLIF(stddev_28d_brl, 0)) > ${c.ANOMALY_Z}
+    AND net_cost_day_brl > ${c.ANOMALY_MIN_BRL}
+  ) AS is_anomaly
+FROM windowed

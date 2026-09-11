@@ -1,0 +1,27 @@
+config {
+  type: "table",
+  schema: dataform.projectConfig.vars.mart_dataset,
+  tags: ["billing_platform"],
+  description: "Rollup mensal. Grao: invoice_month x service x label_environment x label_app x cost_type. Sem colunas de janela (LAG/MoM vao para rpt_cost_monthly).",
+  bigquery: { clusterBy: ["invoice_month", "service_description"] }
+}
+
+SELECT
+  invoice_month,
+  invoice_month_date,
+  service_description,
+  label_environment,
+  label_app,
+  cost_type,
+
+  SUM(gross_cost_brl)              AS gross_cost_brl,
+  SUM(credits_total_brl)           AS credits_total_brl,
+  SUM(net_cost_brl)               AS net_cost_brl,
+  SUM(cost_at_list_brl)           AS cost_at_list_brl,
+  SUM(gross_cost_usd)            AS gross_cost_usd,
+  SUM(net_cost_usd)             AS net_cost_usd,
+  SUM(usage_amount_pricing_units) AS usage_amount_pricing_units,
+  SUM(line_count)                AS line_count
+
+FROM ${ref("fct_billing_cost_daily")}
+GROUP BY invoice_month, invoice_month_date, service_description, label_environment, label_app, cost_type

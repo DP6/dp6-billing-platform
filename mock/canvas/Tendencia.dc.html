@@ -1,0 +1,142 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&family=Ubuntu+Mono:wght@400;700&display=swap">
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Ubuntu,"Segoe UI",system-ui,sans-serif;background:#fcfcfb;color:#1d1d1b;font-size:15px;line-height:1.55}
+  h1,h2,h3{margin:0;font-weight:500;letter-spacing:-.01em}
+  .mono{font-family:"Ubuntu Mono",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
+  .eyebrow{font:500 11px/1.4 Ubuntu,sans-serif;letter-spacing:.22em;text-transform:uppercase;color:#5b626c}
+  a{color:#1a365d}a:hover{color:#0f2136}
+</style>
+</helmet>
+
+<div style="width:1440px;background:#fcfcfb">
+
+  <div style="display:flex;align-items:center;gap:12px;height:52px;padding:0 28px;background:#1d1d1b;color:#f2f1ec">
+    <svg width="24" height="16" viewBox="0 0 26 18" aria-hidden="true"><path d="M2 18 L2 12 L7 10 L7 18 Z" fill="#ffb302"/><path d="M10 18 L10 7 L15 5 L15 18 Z" fill="#ffb302"/><path d="M18 18 L18 2 L23 0 L23 18 Z" fill="#ffb302"/></svg>
+    <span style="font-weight:500">CI Polaris</span><span style="color:#a7abb0;font-size:13px">· controle de custo</span>
+    <span style="flex:1"></span>
+    <span class="mono" style="font-size:11px;border:1px solid #4a4a44;border-radius:999px;padding:4px 9px;color:#d9d6cc">amostra · validação 2026-09-09</span>
+  </div>
+
+  <div style="display:flex;gap:0;padding:0 20px;border-bottom:1px solid #e7e3d8;background:#fcfcfb;font-size:13.5px">
+    <span style="padding:13px 12px 11px;color:#5b626c">Visão geral</span>
+    <span style="padding:13px 12px 11px;color:#5b626c">Orçamento</span>
+    <span style="padding:13px 12px 11px;color:#1d1d1b;border-bottom:2px solid #ffb302;font-weight:500">Tendência</span>
+    <span style="padding:13px 12px 11px;color:#5b626c">Alocação</span>
+    <span style="padding:13px 12px 11px;color:#5b626c">Serviços &amp; SKUs</span>
+    <span style="padding:13px 12px 11px;color:#5b626c">Otimização</span>
+    <span style="padding:13px 12px 11px;color:#5b626c">Unit economics</span>
+    <span style="padding:13px 12px 11px;color:#5b626c">Anomalias</span>
+  </div>
+
+  <div style="padding:24px 28px 36px;display:flex;flex-direction:column;gap:20px">
+
+    <div style="display:flex;flex-direction:column;gap:3px">
+      <span class="eyebrow">Evolução mês a mês</span>
+      <h1 style="font-size:22px">Tendência</h1>
+      <p style="margin:0;color:#5b626c;font-size:13.5px;max-width:72ch">Três meses de histórico. Julho é o primeiro mês (quase zero); setembro é parcial — a barra tracejada mostra o run-rate.</p>
+    </div>
+
+    <div style="background:#fff;border:1px solid #e7e3d8;border-radius:8px;padding:20px">
+      <h3 style="font-size:15px">Custo líquido mensal por serviço</h3>
+      <p style="margin:2px 0 0;color:#8b9099;font-size:12.5px">Barras empilhadas. Só o par azul/verde como série categórica (validado para daltonismo) + "Outros".</p>
+      <div style="margin-top:18px;display:flex;align-items:flex-end;gap:56px;height:220px;padding:0 30px;border-bottom:1px solid #d8d3c4">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+          <div style="width:70px;height:2px;background:#8a8f96"></div>
+          <span class="mono" style="font-size:11px;color:#5b626c">jul/26 · R$ 0,00</span>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+          <div style="display:flex;flex-direction:column;width:70px">
+            <div style="height:15px;background:#8a8f96"></div>
+            <div style="height:1px"></div>
+            <div style="height:12px;background:#059669"></div>
+            <div style="height:1px"></div>
+            <div style="height:162px;background:#1a365d"></div>
+          </div>
+          <span class="mono" style="font-size:11px;color:#1d1d1b;font-weight:700">R$ 23,65</span>
+          <span class="mono" style="font-size:11px;color:#5b626c">ago/26</span>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+          <div style="display:flex;flex-direction:column;width:70px">
+            <div style="height:10px;background:#8a8f96"></div>
+            <div style="height:1px"></div>
+            <div style="height:7px;background:#1a365d"></div>
+          </div>
+          <span class="mono" style="font-size:11px;color:#1d1d1b;font-weight:700">R$ 2,19</span>
+          <span class="mono" style="font-size:11px;color:#5b626c">set/26</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:14px;margin-top:12px;font-size:12px;color:#5b626c">
+        <span style="display:inline-flex;align-items:center;gap:6px"><i style="width:11px;height:11px;border-radius:2px;background:#1a365d"></i>Cloud Run</span>
+        <span style="display:inline-flex;align-items:center;gap:6px"><i style="width:11px;height:11px;border-radius:2px;background:#059669"></i>BigQuery</span>
+        <span style="display:inline-flex;align-items:center;gap:6px"><i style="width:11px;height:11px;border-radius:2px;background:#8a8f96"></i>Outros</span>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div style="background:#fff;border:1px solid #e7e3d8;border-radius:8px;padding:20px">
+        <h3 style="font-size:15px">Variação mês a mês</h3>
+        <p style="margin:2px 0 0;color:#8b9099;font-size:12.5px">Setembro: run-rate (tracejado) vs. realizado (MTD).</p>
+        <div style="margin-top:18px;display:flex;align-items:flex-end;gap:48px;height:180px;padding:0 24px;border-bottom:1px solid #d8d3c4">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+            <div style="width:56px;height:160px;background:#1a365d"></div>
+            <span class="mono" style="font-size:11px;font-weight:700">R$ 23,65</span>
+            <span class="mono" style="font-size:11px;color:#5b626c">ago/26</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+            <div style="position:relative;width:56px;height:160px;display:flex;align-items:flex-end">
+              <div style="position:absolute;left:0;bottom:0;width:56px;height:49px;border:1.5px dashed #1a365d"></div>
+              <div style="width:56px;height:15px;background:#1a365d"></div>
+            </div>
+            <span class="mono" style="font-size:11px;font-weight:700">R$ 2,19</span>
+            <span class="mono" style="font-size:11px;color:#5b626c">set/26</span>
+          </div>
+        </div>
+        <p style="margin:12px 0 0;font-size:12.5px"><span class="mono" style="color:#059669;font-weight:700">−90,7%</span> <span style="color:#5b626c">realizado MTD</span> · <span class="mono" style="color:#059669;font-weight:700">−69%</span> <span style="color:#5b626c">run-rate</span></p>
+      </div>
+
+      <div style="background:#fff;border:1px solid #e7e3d8;border-radius:8px;padding:20px">
+        <h3 style="font-size:15px">Ritmo acumulado</h3>
+        <p style="margin:2px 0 0;color:#8b9099;font-size:12.5px">Acúmulo dia a dia: setembro vs. agosto no mesmo ponto do mês.</p>
+        <div style="margin-top:10px;background:#f4f1ea;border-radius:6px;padding:12px 10px 6px">
+          <svg viewBox="0 0 400 190" style="display:block;width:100%;height:auto;font-family:'Ubuntu Mono',monospace" role="img" aria-label="Acúmulo diário de setembro contra agosto">
+            <line x1="40" y1="165" x2="384" y2="165" stroke="#d8d3c4" stroke-width="1"/>
+            <line x1="40" y1="90"  x2="384" y2="90"  stroke="#d8d3c4" stroke-width="1" opacity=".6"/>
+            <line x1="40" y1="15"  x2="384" y2="15"  stroke="#d8d3c4" stroke-width="1" opacity=".6"/>
+            <text x="34" y="169" text-anchor="end" font-size="9" fill="#5b626c">0</text>
+            <text x="34" y="94"  text-anchor="end" font-size="9" fill="#5b626c">12</text>
+            <text x="34" y="19"  text-anchor="end" font-size="9" fill="#5b626c">24</text>
+            <polyline points="40,165 68,164 97,131 125,111 154,110 182,81 211,42 240,29 268,29 297,20 325,19 354,18 384,18" fill="none" stroke="#8a8f96" stroke-width="2" stroke-dasharray="4 3"/>
+            <polyline points="40,165 68,164 97,163 125,162 154,159 182,157 211,155 240,154 268,151" fill="none" stroke="#1a365d" stroke-width="2"/>
+            <circle cx="268" cy="151" r="3.5" fill="#1a365d" stroke="#f4f1ea" stroke-width="1.5"/>
+            <text x="384" y="14" text-anchor="end" font-size="9" fill="#5b626c">ago</text>
+            <text x="274" y="149" font-size="9" fill="#1a365d">set (MTD)</text>
+            <text x="40"  y="182" text-anchor="middle" font-size="9" fill="#5b626c">dia 1</text>
+            <text x="384" y="182" text-anchor="end"    font-size="9" fill="#5b626c">dia 13</text>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:12px;padding:14px 16px;background:#f4f1ea;border:1px solid #e7e3d8;border-left:2px solid #ffb302;border-radius:6px;font-size:13px;color:#5b626c">
+      <span aria-hidden="true">◆</span>
+      <span>O custo se concentra em dias úteis de deploy/carga: quase todo o gasto de agosto veio da janela de 21 a 26/ago. Fora dessas janelas, o projeto roda a ~<span class="mono">R$ 0,25/dia</span>.</span>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"$preview":{"width":1440,"height":1080}}'>
+class Component extends DCLogic {}
+</script>
+</body>
+</html>

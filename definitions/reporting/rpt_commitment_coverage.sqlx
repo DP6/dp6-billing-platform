@@ -1,0 +1,31 @@
+config {
+  type: "view",
+  schema: dataform.projectConfig.vars.reporting_dataset,
+  tags: ["billing_platform"],
+  description: "1 linha: fracao do gasto elegivel coberta por CUD. 0 nesta conta (validation #03 -> so DISCOUNT spend-based). Serve o gauge da aba Otimizacao."
+}
+
+js { const c = require("includes/constants"); }
+
+WITH w AS (
+  SELECT *
+  FROM ${ref("fct_billing_cost_daily")}
+  WHERE usage_date >= DATE_SUB(CURRENT_DATE('${dataform.projectConfig.vars.timezone}'), INTERVAL 90 DAY)
+    AND cost_type = 'regular'
+),
+-- servicos elegiveis a CUD (Compute-like). Cloud Run entra no CUD "flexivel".
+elig AS (
+  SELECT
+    SUM(net_cost_brl) AS eligible_spend_brl,
+    -- creditos CUD ficam latentes no staging; aqui aproximamos por 0 ate haver commitment
+    0.0 AS cud_credited_brl
+  FROM w
+  WHERE service_description IN ('Cloud Run', 'Compute Engine')
+)
+
+SELECT
+  SAFE_DIVIDE(cud_credited_brl, NULLIF(eligible_spend_brl, 0)) AS covered_pct,
+  eligible_spend_brl,
+  eligible_spend_brl - cud_credited_brl                        AS on_demand_spend_brl,
+  ${c.CUD_REEVAL_THRESHOLD_BRL}                                AS cud_reeval_threshold_brl
+FROM elig

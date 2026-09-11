@@ -1,0 +1,18 @@
+config {
+  type: "table",
+  schema: dataform.projectConfig.vars.mart_dataset,
+  tags: ["billing_platform"],
+  description: "Dimensao service/sku. first_seen/last_seen para detectar SKU novo (surpresa de custo)."
+}
+
+SELECT
+  service_id,
+  service_description,
+  sku_id,
+  sku_description,
+  pricing_unit,
+  MIN(usage_date)  AS first_seen_date,
+  MAX(usage_date)  AS last_seen_date,
+  SUM(net_cost_brl) AS net_cost_brl_lifetime
+FROM ${ref("stg_billing_platform")}
+GROUP BY service_id, service_description, sku_id, sku_description, pricing_unit

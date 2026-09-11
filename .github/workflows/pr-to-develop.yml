@@ -1,0 +1,30 @@
+name: PR automática para develop
+
+# Todo push em qualquer branch (exceto develop/main) abre PR automaticamente pra develop.
+# O merge dessa PR é manual, sem trava do GitHub (sem review count obrigatório) — a trava
+# real do fluxo de promoção fica no gate de reviewers do Environment dev-deploy, em
+# deploy-dev.yml. Exige "Allow GitHub Actions to create and approve pull requests" habilitado
+# nas Settings > Actions do repo (senão o gh pr create falha por falta de permissão).
+
+on:
+  push:
+    branches-ignore: [develop, main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  open-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: abre (ou reaproveita) PR pra develop
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr create --base develop --head "${{ github.ref_name }}" \
+            --title "${{ github.ref_name }}" \
+            --body "PR automática — aguardando revisão antes de promover pra develop." \
+            || echo "PR já existe pra essa branch, nada a fazer."

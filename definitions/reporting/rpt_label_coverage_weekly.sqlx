@@ -1,0 +1,15 @@
+config {
+  type: "view",
+  schema: dataform.projectConfig.vars.reporting_dataset,
+  tags: ["billing_platform"],
+  description: "Progressao semanal da cobertura de label (labels aplicadas em 26/08 -> curva sobe). Serve o grafico de progressao da aba Alocacao."
+}
+
+SELECT
+  DATE_TRUNC(usage_date, WEEK(MONDAY)) AS week_start,
+  SAFE_DIVIDE(SUM(IF(label_app IS NOT NULL, net_cost_brl, 0)),         NULLIF(SUM(net_cost_brl), 0)) AS pct_app,
+  SAFE_DIVIDE(SUM(IF(label_environment IS NOT NULL, net_cost_brl, 0)), NULLIF(SUM(net_cost_brl), 0)) AS pct_environment,
+  SAFE_DIVIDE(SUM(IF(label_managed_by IS NOT NULL, net_cost_brl, 0)),  NULLIF(SUM(net_cost_brl), 0)) AS pct_managed_by,
+  SUM(net_cost_brl) AS net_cost_week_brl
+FROM ${ref("fct_billing_cost_daily")}
+GROUP BY week_start

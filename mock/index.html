@@ -1,0 +1,909 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Custo CI Polaris</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&family=Ubuntu+Mono:wght@400;700&display=swap">
+<style>
+/* ============ DP6 Design System — tokens (espelho de apps/web/src/index.css / atlas) ============
+   Dark é o padrão. :root = claro; [data-theme="dark"] = escuro (o mock usa atributo; o app usa
+   classe .dark). Sem @media prefers-color-scheme — tema sempre explícito. ============ */
+:root{
+  --bg:#fafaf8; --surface:#f0efec; --well:#e9e9e6;
+  --ink:#1d1d1b; --ink-dim:#555b62; --ink-mute:#7c8188;
+  --hair:#dedcda; --hair-strong:#cfccc7;
+  --accent:#ffb302; --accent-press:#c98a00; --accent-2:#ffca45;
+  --c-net:#1a365d; --c-alt:#059669; --c-other:#8a8f96;
+  --c-alert:#c1291f; --c-credit:#6b46c1;
+  --ok:#0b7a43; --warn:#8a5700; --bad:#c1291f;
+  --focus:rgba(255,179,2,.45);
+  --shadow-md:0 1px 2px rgb(0 0 0/.06),0 2px 8px rgb(0 0 0/.08);
+  --radius:5px;
+}
+:root[data-theme="dark"]{
+  --bg:#1d1d1b; --surface:#2a2a28; --well:#3a3a38;
+  --ink:#ffffff; --ink-dim:#8f96a1; --ink-mute:#7c8188;
+  --hair:#3a3a38; --hair-strong:#4a4a45;
+  --accent:#ffb302; --accent-press:#ffca4d; --accent-2:#ffca45;
+  --c-net:#63b3ed; --c-alt:#34d399; --c-other:#6b7078;
+  --c-alert:#f87171; --c-credit:#b794f4;
+  --ok:#34d399; --warn:#ffb302; --bad:#f87171;
+  --focus:rgba(255,179,2,.5);
+  --shadow-md:0 4px 12px rgb(0 0 0/.4);
+}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font:400 15px/1.6 Ubuntu,"Segoe UI",system-ui,-apple-system,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3{margin:0; font-weight:500; letter-spacing:-.01em; text-wrap:balance}
+.mono{font-family:"Ubuntu Mono",ui-monospace,"SF Mono",Menlo,monospace; font-variant-numeric:tabular-nums}
+.eyebrow{font:500 11px/1.4 Ubuntu,sans-serif; letter-spacing:.22em; text-transform:uppercase; color:var(--ink-dim)}
+a{color:inherit}
+button,select{font:inherit; color:inherit}
+:focus-visible{outline:3px solid var(--focus); outline-offset:2px; border-radius:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important; animation:none!important}}
+
+/* ============ chrome ============ */
+.topbar{
+  position:sticky; top:0; z-index:20; display:flex; align-items:center; gap:14px;
+  height:56px; padding:0 28px; background:var(--ink); color:#f2f1ec;
+  border-bottom:1px solid #000;
+}
+.brandmark{display:block}
+.topbar .name{font-weight:500}
+.topbar .sub{color:#a7abb0; font-size:13px}
+.topbar .spacer{flex:1}
+.pill{
+  font:400 11px/1 "Ubuntu Mono",monospace; letter-spacing:.04em;
+  padding:5px 9px; border:1px solid #4a4a44; border-radius:999px; color:#d9d6cc; white-space:nowrap;
+}
+.icon-btn{
+  display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px;
+  background:transparent; border:1px solid #4a4a44; border-radius:4px; cursor:pointer; color:#f2f1ec;
+}
+.icon-btn:hover{border-color:var(--accent)}
+
+.filters{
+  display:flex; flex-wrap:wrap; align-items:end; gap:18px 22px;
+  padding:14px 28px; background:var(--well); border-bottom:1px solid var(--hair);
+}
+.field{display:flex; flex-direction:column; gap:4px}
+.field label{font:500 10px/1 Ubuntu,sans-serif; letter-spacing:.18em; text-transform:uppercase; color:var(--ink-dim)}
+.field select{
+  appearance:none; -webkit-appearance:none; padding:7px 30px 7px 10px; min-width:132px;
+  background:var(--surface) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0l5 6 5-6z' fill='%235b626c'/></svg>") no-repeat right 10px center;
+  border:1px solid var(--hair-strong); border-radius:4px; font-size:14px;
+}
+.filters .note{margin-left:auto; align-self:center; font-size:12px; color:var(--ink-mute); max-width:230px}
+
+.tabs{display:flex; gap:2px; padding:0 20px; border-bottom:1px solid var(--hair); background:var(--bg); overflow-x:auto}
+.tab{
+  padding:14px 14px 12px; background:none; border:0; border-bottom:2px solid transparent;
+  color:var(--ink-dim); cursor:pointer; white-space:nowrap; font-size:14px;
+}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected="true"]{color:var(--ink); border-bottom-color:var(--accent); font-weight:500}
+
+main{max-width:1180px; margin:0 auto; padding:28px}
+.panel[hidden]{display:none}
+.panel{display:flex; flex-direction:column; gap:26px}
+.panel > header{display:flex; flex-direction:column; gap:3px}
+.panel > header p{margin:0; color:var(--ink-dim); font-size:13.5px; max-width:64ch}
+
+/* ============ cards & tiles ============ */
+.card{
+  position:relative;
+  background:var(--surface); border:1px solid var(--hair); border-radius:var(--radius); padding:22px;
+}
+.card > h3{font-size:15px}
+.card .cap{margin:2px 0 0; color:var(--ink-mute); font-size:12.5px}
+.grid{display:grid; gap:16px}
+
+/* Régua amarela em canto (L no topo-esquerda) — todo card/tile/gráfico */
+.card::before,.tile::before,.chartwrap::before{
+  content:""; position:absolute; top:-1px; left:-1px;
+  width:86%; max-width:220px; height:22px;
+  border-top:2px solid var(--accent); border-left:2px solid var(--accent);
+  border-top-left-radius:var(--radius); pointer-events:none;
+}
+
+.scorecard{grid-template-columns:repeat(6,1fr)}
+@media (max-width:1080px){.scorecard{grid-template-columns:repeat(3,1fr)}}
+@media (max-width:620px){.scorecard{grid-template-columns:repeat(2,1fr)}}
+.sc-split{display:grid; grid-template-columns:minmax(0,.9fr) minmax(0,1.9fr); gap:24px; align-items:start}
+.sc-split > div:first-child{border-right:1px solid var(--hair); padding-right:24px}
+.sc-split .sc-eyebrow{font:500 10px/1 Ubuntu,sans-serif; letter-spacing:.18em; text-transform:uppercase; color:var(--ink-dim); display:block; margin-bottom:8px}
+@media (max-width:760px){.sc-split{grid-template-columns:1fr} .sc-split > div:first-child{border-right:0; padding-right:0}}
+.tile{position:relative; background:var(--surface); border:1px solid var(--hair); border-radius:var(--radius); padding:16px 16px 15px; display:flex; flex-direction:column; gap:7px}
+.tile .k{font:500 10px/1.3 Ubuntu,sans-serif; letter-spacing:.16em; text-transform:uppercase; color:var(--ink-dim)}
+.tile .v{font-family:"Ubuntu Mono",monospace; font-weight:700; font-size:27px; letter-spacing:-.02em; line-height:1.05}
+.tile .s{font-size:12px; color:var(--ink-dim)}
+.tile .s .mono{font-size:12px}
+.delta-down{color:var(--ok)} .delta-up{color:var(--bad)}
+.chip{display:inline-flex; align-items:center; gap:5px; align-self:flex-start; padding:3px 8px; border-radius:999px; font-size:11.5px; font-weight:500}
+.chip.ok{background:color-mix(in srgb,var(--ok) 15%,transparent); color:var(--ok)}
+.chip.warn{background:color-mix(in srgb,var(--warn) 16%,transparent); color:var(--warn)}
+.chip.bad{background:color-mix(in srgb,var(--bad) 15%,transparent); color:var(--bad)}
+.bar-track{height:5px; border-radius:3px; background:var(--well); overflow:hidden; margin-top:2px}
+.bar-fill{height:100%; background:var(--accent)}
+
+.row-2{display:grid; grid-template-columns:1.55fr 1fr; gap:16px}
+@media (max-width:860px){.row-2{grid-template-columns:1fr}}
+
+/* legend + tables */
+.legend{display:flex; flex-wrap:wrap; gap:14px; margin-top:12px; font-size:12.5px; color:var(--ink-dim)}
+.legend span{display:inline-flex; align-items:center; gap:6px}
+.swatch{width:11px; height:11px; border-radius:2px; flex:none}
+.datatable{width:100%; border-collapse:collapse; font-size:13px; margin-top:4px}
+.datatable th,.datatable td{text-align:right; padding:7px 10px; border-bottom:1px solid var(--hair)}
+.datatable th:first-child,.datatable td:first-child{text-align:left}
+.datatable thead th{font:500 10px/1.4 Ubuntu,sans-serif; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-dim); border-bottom-color:var(--hair-strong)}
+.datatable td.num{font-family:"Ubuntu Mono",monospace; font-variant-numeric:tabular-nums}
+.datatable tr:last-child td{border-bottom:0}
+.toggle-tbl{margin-top:12px; background:none; border:1px solid var(--hair-strong); border-radius:4px; padding:5px 10px; font-size:12px; cursor:pointer; color:var(--ink-dim)}
+.toggle-tbl:hover{border-color:var(--accent); color:var(--ink)}
+
+/* svg chart shell */
+.chartwrap{position:relative; margin-top:6px; background:var(--well); border-radius:6px; padding:12px 10px 6px}
+svg.chart{display:block; width:100%; height:auto; font-family:"Ubuntu Mono",monospace}
+.chart text{fill:var(--ink-dim)}
+.chart .tickline{stroke:var(--hair-strong); stroke-width:1}
+.chart .axis{stroke:var(--hair-strong); stroke-width:1}
+.tooltip{
+  position:fixed; z-index:40; pointer-events:none; background:var(--ink); color:#f2f1ec;
+  font:400 12px/1.4 "Ubuntu Mono",monospace; padding:7px 9px; border-radius:4px; box-shadow:var(--shadow-md);
+  opacity:0; transition:opacity .12s;
+}
+
+.recon-row{display:grid; grid-template-columns:78px 1fr 96px 74px; align-items:center; gap:12px; padding:11px 0; border-bottom:1px solid var(--hair)}
+.recon-row:last-child{border-bottom:0}
+.recon-row .m{font-family:"Ubuntu Mono",monospace; color:var(--ink-dim); font-size:13px}
+.recon-row .val{font-family:"Ubuntu Mono",monospace; font-weight:700; text-align:right}
+.recon-bar{height:14px; background:var(--well); border-radius:3px; overflow:hidden; display:flex}
+.recon-bar i{display:block; height:100%}
+
+.callout{display:flex; gap:12px; padding:14px 16px; background:var(--well); border:1px solid var(--hair); border-left:2px solid var(--accent); border-radius:6px; font-size:13.5px}
+.callout b{font-weight:500}
+
+.placeholder{text-align:center; padding:40px 24px; border:1px dashed var(--hair-strong); border-radius:var(--radius); background:var(--well)}
+.placeholder h3{font-size:20px; font-weight:300; letter-spacing:-.02em}
+.placeholder p{margin:8px auto 0; max-width:52ch; color:var(--ink-dim); font-size:13.5px}
+
+footer{border-top:1px solid var(--hair); background:var(--ink); color:#a7abb0; padding:16px 28px; font:400 11.5px/1.5 "Ubuntu Mono",monospace}
+footer b{color:#d9d6cc; font-weight:400}
+</style>
+</head>
+<body data-palette="#1a365d,#059669,#8a8f96">
+
+<header class="topbar">
+  <svg class="brandmark" width="26" height="18" viewBox="0 0 26 18" aria-hidden="true">
+    <path d="M2 18 L2 12 L7 10 L7 18 Z" fill="#ffb302"/>
+    <path d="M10 18 L10 7 L15 5 L15 18 Z" fill="#ffb302"/>
+    <path d="M18 18 L18 2 L23 0 L23 18 Z" fill="#ffb302"/>
+  </svg>
+  <span class="name">CI Polaris</span>
+  <span class="sub">· controle de custo</span>
+  <span class="spacer"></span>
+  <span class="pill">amostra · validação 2026-09-09</span>
+  <button class="icon-btn" id="themeBtn" aria-label="Alternar tema" title="Alternar tema">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="3.4"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.4 1.4M11.6 11.6L13 13M13 3l-1.4 1.4M4.4 11.6L3 13"/></svg>
+  </button>
+</header>
+
+<div class="filters">
+  <div class="field"><label for="f-period">Período</label>
+    <select id="f-period"><option>Mês corrente</option><option>Últimos 30 dias</option><option>Últimos 90 dias</option><option>Este ano</option><option>Personalizado</option></select></div>
+  <div class="field"><label for="f-svc">Serviço</label>
+    <select id="f-svc"><option>Todos</option><option>Cloud Run</option><option>BigQuery</option><option>Secret Manager</option></select></div>
+  <div class="field"><label for="f-env">Ambiente</label>
+    <select id="f-env"><option>Todos</option><option>prod</option><option>dev</option></select></div>
+  <div class="field"><label for="f-app">App</label>
+    <select id="f-app"><option>Todos</option><option>atlas</option><option>polaris-cost-control</option></select></div>
+  <div class="field"><label for="f-cur">Moeda</label>
+    <select id="f-cur"><option>BRL</option><option>USD</option></select></div>
+  <p class="note">Mock de referência (specs/005), sem back-end. Widgets mês-âncora ignoram o Período; respeitam Serviço/Ambiente/App.</p>
+</div>
+
+<nav class="tabs" role="tablist" aria-label="Seções">
+  <button class="tab" role="tab" aria-selected="true"  aria-controls="p-visao"  id="t-visao">Visão geral</button>
+  <button class="tab" role="tab" aria-selected="false" aria-controls="p-tend"   id="t-tend">Tendência</button>
+  <button class="tab" role="tab" aria-selected="false" aria-controls="p-skus"   id="t-skus">Serviços &amp; SKUs</button>
+  <button class="tab" role="tab" aria-selected="false" aria-controls="p-aloc"   id="t-aloc">Alocação &amp; showback</button>
+  <button class="tab" role="tab" aria-selected="false" aria-controls="p-efic"   id="t-efic">Eficiência &amp; economia</button>
+  <button class="tab" role="tab" aria-selected="false" aria-controls="p-anom"   id="t-anom">Anomalias</button>
+</nav>
+
+<main>
+
+  <!-- ============ VISÃO GERAL ============ -->
+  <section class="panel" id="p-visao" role="tabpanel" aria-labelledby="t-visao">
+    <header>
+      <span class="eyebrow">Setembro 2026 · mês corrente (MTD, 9 dias)</span>
+      <h1 style="font-size:22px">Visão geral</h1>
+      <p>Custo faturado do projeto <span class="mono">dp6-ci-polaris</span> a partir do billing export. Fatura em BRL; conversão USD pela taxa da linha.</p>
+    </header>
+
+    <!-- scorecard dividido: esquerda = não segue o Período; direita = segue -->
+    <div class="sc-split" id="scorecard"></div>
+
+    <div class="card">
+      <h3>Reconciliação com a fatura</h3>
+      <p class="cap">net = custo bruto + créditos. Cada mês confere com o relatório de faturamento do console.</p>
+      <div id="recon" style="margin-top:8px"></div>
+    </div>
+
+    <!-- Orçamento do mês (ex-aba Orçamento, agora seção da Visão Geral — specs/005 §1) -->
+    <div style="display:flex;flex-direction:column;gap:3px;margin-top:6px">
+      <span class="eyebrow">Orçamento do mês · R$ 20,00</span>
+      <h2 style="font-size:18px">Orçamento &amp; previsão</h2>
+    </div>
+
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
+      <div class="tile"><span class="k">Consumido · MTD</span><span class="v">R$ 2,19</span><span class="s">11% de R$ 20,00</span></div>
+      <div class="tile"><span class="k">Projeção fim de mês</span><span class="v">R$ 7,30</span><span class="s">37% · run-rate linear</span></div>
+      <div class="tile"><span class="k">Folga projetada</span><span class="v">R$ 12,70</span><span class="s">orçamento − projeção</span></div>
+      <div class="tile"><span class="k">Estouro projetado</span><span class="v" style="font-size:19px">sem estouro</span><span class="s">no ritmo atual</span></div>
+    </div>
+
+    <div class="row-2">
+      <div class="card">
+        <h3>Consumo acumulado vs. orçamento</h3>
+        <p class="cap">Linha cheia = realizado (MTD) · tracejada = projeção linear até o fim do mês. Faixas 50/80/100/120%.</p>
+        <div class="chartwrap">
+          <svg class="chart" viewBox="0 0 420 210" role="img" aria-label="Consumo acumulado do mês versus orçamento">
+            <line class="tickline" x1="40" y1="24"  x2="410" y2="24"/><text x="34" y="27" text-anchor="end" font-size="9">120% R$24</text>
+            <line class="tickline" x1="40" y1="54"  x2="410" y2="54"/><text x="34" y="57" text-anchor="end" font-size="9">100% R$20</text>
+            <line class="tickline" x1="40" y1="90"  x2="410" y2="90"/><text x="34" y="93" text-anchor="end" font-size="9">80% R$16</text>
+            <line class="tickline" x1="40" y1="132" x2="410" y2="132"/><text x="34" y="135" text-anchor="end" font-size="9">50% R$10</text>
+            <line class="axis" x1="40" y1="180" x2="410" y2="180"/>
+            <path d="M40,180 L86,178 L133,176 L179,173 L226,170 L272,169 L294,167" fill="none" stroke="var(--c-net)" stroke-width="2"/>
+            <path d="M294,167 L410,120" fill="none" stroke="var(--c-net)" stroke-width="1.5" stroke-dasharray="4 3"/>
+            <circle cx="294" cy="167" r="3.2" fill="var(--c-net)"/>
+            <text x="40"  y="196" text-anchor="middle" font-size="9">dia 1</text>
+            <text x="294" y="196" text-anchor="middle" font-size="9">dia 9 (hoje)</text>
+            <text x="410" y="196" text-anchor="end"    font-size="9">dia 30</text>
+          </svg>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Escada de thresholds</h3>
+        <p class="cap">Marcador na projeção de fim de mês (37%).</p>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
+          <div style="display:flex;align-items:center;gap:8px"><span class="mono" style="flex:0 0 96px;font-size:12px;color:var(--ink-dim)">50% · R$10</span><span class="bar-track" style="flex:1;height:10px"><span class="bar-fill" style="width:74%;background:var(--c-alt)"></span></span></div>
+          <div style="display:flex;align-items:center;gap:8px"><span class="mono" style="flex:0 0 96px;font-size:12px;color:var(--ink-dim)">80% · R$16</span><span class="bar-track" style="flex:1;height:10px"><span class="bar-fill" style="width:46%;background:var(--c-alt)"></span></span></div>
+          <div style="display:flex;align-items:center;gap:8px"><span class="mono" style="flex:0 0 96px;font-size:12px;color:var(--ink)">100% · R$20 <span style="color:var(--accent)">◀ 37%</span></span><span class="bar-track" style="flex:1;height:10px"><span class="bar-fill" style="width:37%;background:var(--accent)"></span></span></div>
+          <div style="display:flex;align-items:center;gap:8px"><span class="mono" style="flex:0 0 96px;font-size:12px;color:var(--ink-dim)">120% · R$24</span><span class="bar-track" style="flex:1;height:10px"><span class="bar-fill" style="width:31%;background:var(--c-other)"></span></span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Previsão — próximos 3 meses</h3>
+      <p class="cap">Barra = estimativa de tendência · linha vertical = faixa. Agosto foi atípico; incerteza alta.</p>
+      <div class="chartwrap">
+        <svg class="chart" viewBox="0 0 420 170" role="img" aria-label="Previsão dos próximos três meses com faixa de incerteza">
+          <line class="axis" x1="36" y1="140" x2="410" y2="140"/>
+          <g font-size="9" text-anchor="middle">
+            <rect x="70"  y="104" width="44" height="36" fill="var(--c-net)" rx="1"/><line x1="92"  y1="60"  x2="92"  y2="128" stroke="var(--ink-dim)" stroke-width="1.5"/><text x="92"  y="98">R$ 9</text><text x="92"  y="156">out · R$5–16</text>
+            <rect x="188" y="98"  width="44" height="42" fill="var(--c-net)" rx="1"/><line x1="210" y1="48"  x2="210" y2="128" stroke="var(--ink-dim)" stroke-width="1.5"/><text x="210" y="92">R$ 10</text><text x="210" y="156">nov · R$5–20</text>
+            <rect x="306" y="92"  width="44" height="48" fill="var(--c-net)" rx="1"/><line x1="328" y1="40"  x2="328" y2="128" stroke="var(--ink-dim)" stroke-width="1.5"/><text x="328" y="86">R$ 11</text><text x="328" y="156">dez · R$6–22</text>
+          </g>
+        </svg>
+      </div>
+      <div class="callout" style="margin-top:10px"><span aria-hidden="true">◆</span><span>Histórico curto e com meses atípicos — a faixa da previsão é larga de propósito. Recalibra conforme o histórico cresce.</span></div>
+    </div>
+
+    <!-- ---- widgets que seguem o Período ---- -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap">
+        <div><h3>Custo líquido no tempo</h3>
+          <p class="cap">Barras = custo do período · linha = acumulado (eixo à direita) · tracejada = média móvel 7 dias.</p></div>
+        <div style="display:flex;gap:10px">
+          <label style="display:flex;flex-direction:column;gap:3px"><span style="font:500 10px/1 Ubuntu;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-dim)">Granularidade</span>
+            <select style="padding:5px 8px;font-size:12px;background:var(--surface);border:1px solid var(--hair-strong);border-radius:var(--radius)"><option>Dia</option><option>Mês</option></select></label>
+          <label style="display:flex;flex-direction:column;gap:3px"><span style="font:500 10px/1 Ubuntu;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-dim)">Empilhar por</span>
+            <select style="padding:5px 8px;font-size:12px;background:var(--surface);border:1px solid var(--hair-strong);border-radius:var(--radius)"><option>Nenhum</option><option>Serviço</option><option>Ambiente</option><option>App</option></select></label>
+        </div>
+      </div>
+      <div class="chartwrap"><div id="c-daily"></div></div>
+    </div>
+
+    <div class="row-2">
+      <div class="card">
+        <h3>Custo por serviço</h3>
+        <p class="cap">Acumulado do período (R$). Serviço com maior gasto em destaque.</p>
+        <div id="c-services"></div>
+        <button class="toggle-tbl" data-target="tbl-services" aria-expanded="false">Ver tabela</button>
+        <div id="tbl-services" hidden></div>
+      </div>
+      <div class="card">
+        <h3>Custo por app e ambiente</h3>
+        <p class="cap">Só a fração do custo com a label preenchida (hoje ~10%). Detalhe na aba Alocação.</p>
+        <div style="display:flex;flex-direction:column;gap:14px;margin-top:8px">
+          <div><span class="sc-eyebrow">por app</span>
+            <div style="display:flex;align-items:center;gap:10px;margin:5px 0"><span style="flex:0 0 150px;font-size:12.5px;color:var(--ink-dim)">atlas</span><span class="bar-track" style="flex:1;height:13px"><span class="bar-fill" style="width:8%;background:var(--c-net)"></span></span><span class="mono" style="flex:0 0 52px;text-align:right;font-size:12px">R$ 0,60</span></div>
+            <div style="display:flex;align-items:center;gap:10px;margin:5px 0"><span style="flex:0 0 150px;font-size:12.5px;color:var(--ink-dim)">polaris-cost-control</span><span class="bar-track" style="flex:1;height:13px"><span class="bar-fill" style="width:4%;background:var(--c-other)"></span></span><span class="mono" style="flex:0 0 52px;text-align:right;font-size:12px">R$ 0,30</span></div>
+            <div style="display:flex;align-items:center;gap:10px;margin:5px 0"><span style="flex:0 0 150px;font-size:12.5px;color:var(--ink-mute)">(não-alocado)</span><span class="bar-track" style="flex:1;height:13px"><span class="bar-fill" style="width:100%;background:var(--c-other)"></span></span><span class="mono" style="flex:0 0 52px;text-align:right;font-size:12px">R$ 23,78</span></div>
+          </div>
+          <div><span class="sc-eyebrow">por ambiente</span>
+            <div style="display:flex;align-items:center;gap:10px;margin:5px 0"><span style="flex:0 0 150px;font-size:12.5px;color:var(--ink-dim)">prod</span><span class="bar-track" style="flex:1;height:13px"><span class="bar-fill" style="width:10%;background:var(--c-net)"></span></span><span class="mono" style="flex:0 0 52px;text-align:right;font-size:12px">R$ 0,75</span></div>
+            <div style="display:flex;align-items:center;gap:10px;margin:5px 0"><span style="flex:0 0 150px;font-size:12.5px;color:var(--ink-dim)">dev</span><span class="bar-track" style="flex:1;height:13px"><span class="bar-fill" style="width:5%;background:var(--c-alt)"></span></span><span class="mono" style="flex:0 0 52px;text-align:right;font-size:12px">R$ 0,35</span></div>
+            <div style="display:flex;align-items:center;gap:10px;margin:5px 0"><span style="flex:0 0 150px;font-size:12.5px;color:var(--ink-mute)">(não-alocado)</span><span class="bar-track" style="flex:1;height:13px"><span class="bar-fill" style="width:100%;background:var(--c-other)"></span></span><span class="mono" style="flex:0 0 52px;text-align:right;font-size:12px">R$ 23,78</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TENDÊNCIA ============ -->
+  <section class="panel" id="p-tend" role="tabpanel" aria-labelledby="t-tend" hidden>
+    <header>
+      <span class="eyebrow">Evolução mês a mês</span>
+      <h1 style="font-size:22px">Tendência</h1>
+      <p>Três meses de histórico (jul/2026 é o primeiro mês, quase zero). Setembro é parcial — a barra fantasma mostra o run-rate projetado.</p>
+    </header>
+
+    <div class="card">
+      <h3>Custo líquido mensal por serviço</h3>
+      <p class="cap">Barras empilhadas. Só as duas séries validadas para daltonismo (azul/verde) + "Outros".</p>
+      <div class="chartwrap"><div id="c-monthly"></div></div>
+      <div class="legend" id="lg-monthly"></div>
+    </div>
+
+    <div class="row-2">
+      <div class="card">
+        <h3>Variação mês a mês</h3>
+        <p class="cap">Δ sobre o mês anterior. No mês aberto: run-rate (fantasma) vs. realizado (MTD).</p>
+        <div class="chartwrap"><div id="c-mom"></div></div>
+      </div>
+      <div class="card">
+        <h3>Ritmo acumulado</h3>
+        <p class="cap">Acúmulo dia a dia: mês corrente vs. mês anterior no mesmo ponto do mês.</p>
+        <div class="chartwrap"><div id="c-pace"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SERVIÇOS & SKUs ============ -->
+  <section class="panel" id="p-skus" role="tabpanel" aria-labelledby="t-skus" hidden>
+    <header>
+      <span class="eyebrow">Detalhe por SKU</span>
+      <h1 style="font-size:22px">Serviços &amp; SKUs</h1>
+      <p>Composição do custo por SKU e custo unitário. Chip de atenção em SKU visto pela primeira vez nos últimos 30 dias.</p>
+    </header>
+
+    <div class="callout"><span aria-hidden="true">◆</span><span><b>SKU novo (últimos 30 dias):</b> <span class="mono">Cloud Run · Requests</span> — primeira ocorrência 2026-08-28. Sem histórico para comparar.</span></div>
+
+    <div class="card">
+      <h3>Custo por serviço → SKU</h3>
+      <p class="cap">Barras aninhadas: serviço → SKU. Expandível por serviço.</p>
+      <div id="c-sku" style="margin-top:8px"></div>
+    </div>
+
+    <div class="card">
+      <h3>Custo unitário por SKU</h3>
+      <p class="cap">custo unitário = custo líquido ÷ uso (na unidade de preço). Amostra do período.</p>
+      <div id="tbl-unit"></div>
+    </div>
+  </section>
+
+  <!-- ============ ANOMALIAS ============ -->
+  <section class="panel" id="p-anom" role="tabpanel" aria-labelledby="t-anom" hidden>
+    <header>
+      <span class="eyebrow">Dias fora do padrão</span>
+      <h1 style="font-size:22px">Anomalias</h1>
+      <p>Sinaliza quando o custo do dia passa de <span class="mono">z-score &gt; 3</span> <b>e</b> de <span class="mono">R$ 1,00/dia</span> — o piso absoluto evita ruído na escala de centavos.</p>
+    </header>
+
+    <div class="callout"><span aria-hidden="true">▲</span><span><b>Regra ativa:</b> <span class="mono">z-score &gt; 3</span> <b>e</b> <span class="mono">&gt; R$ 1,00/dia</span> · janela de média 28 dias.</span></div>
+
+    <div class="card">
+      <h3>Ocorrências</h3>
+      <p class="cap">Sparkline = custo diário do serviço nos 30 dias ao redor; ponto vermelho = o dia sinalizado.</p>
+      <div id="anom-list" style="margin-top:10px"></div>
+    </div>
+  </section>
+
+  <!-- ============ ALOCAÇÃO & SHOWBACK ============ -->
+  <section class="panel" id="p-aloc" role="tabpanel" aria-labelledby="t-aloc" hidden>
+    <header>
+      <span class="eyebrow">Rateio por app / ambiente</span>
+      <h1 style="font-size:22px">Alocação &amp; showback</h1>
+      <p>De quem é o custo? A tela mostra a <b>progressão</b> da cobertura de label e a prontidão para chargeback — o rateio final ainda não é confiável.</p>
+    </header>
+
+    <div class="callout"><span aria-hidden="true">▲</span><span><b>Cobertura de label 4–10% do custo.</b> O rateio abaixo cobre só a fração já rotulada — não use para chargeback ainda.</span></div>
+
+    <div class="card">
+      <h3>Cobertura de label · por custo</h3>
+      <p class="cap">Fração do custo líquido total (<span class="mono">R$ 26,41</span>) com cada chave preenchida.</p>
+      <div id="c-coverage" style="margin-top:10px"></div>
+    </div>
+
+    <div class="row-2">
+      <div class="card">
+        <h3>Progressão da cobertura (por semana)</h3>
+        <p class="cap">A curva sobe conforme as labels são aplicadas aos recursos (rollout desde 26/08).</p>
+        <div class="chartwrap">
+          <svg class="chart" viewBox="0 0 380 170" role="img" aria-label="Progressão semanal da cobertura de label">
+            <line class="tickline" x1="34" y1="30" x2="370" y2="30"/><text x="28" y="33" text-anchor="end" font-size="9">15%</text>
+            <line class="axis" x1="34" y1="140" x2="370" y2="140"/><text x="28" y="143" text-anchor="end" font-size="9">0%</text>
+            <path d="M34,140 L146,140 L258,116 L370,100" fill="none" stroke="var(--c-credit)" stroke-width="2"/>
+            <path d="M34,140 L146,138 L258,128 L370,124" fill="none" stroke="var(--c-net)" stroke-width="2"/>
+            <path d="M34,140 L146,138 L258,128 L370,123" fill="none" stroke="var(--c-alt)" stroke-width="1.5" stroke-dasharray="3 3"/>
+            <text x="34"  y="156" text-anchor="middle" font-size="9">18/ago</text>
+            <text x="370" y="156" text-anchor="end"    font-size="9">08/set</text>
+          </svg>
+          <div class="legend"><span><i class="swatch" style="background:var(--c-credit)"></i>managed-by</span><span><i class="swatch" style="background:var(--c-net)"></i>app</span><span><i class="swatch" style="background:var(--c-alt)"></i>environment</span></div>
+        </div>
+      </div>
+      <div class="card" style="display:flex;flex-direction:column;gap:14px">
+        <div class="tile flag" style="border:0;border-top:2px solid var(--accent);padding:0 0 4px">
+          <span class="k">Custo não-alocado</span><span class="v">R$ 23,78</span><span class="s">90% do custo · sem app nem environment</span>
+        </div>
+        <div>
+          <h3 style="font-size:14px">Prontidão de chargeback</h3>
+          <p class="cap" style="margin-bottom:8px">10% — não pronto</p>
+          <div style="display:flex;flex-direction:column;gap:6px;font-size:12.5px">
+            <span><span style="color:var(--ok)">✓</span> labels padrão via <span class="mono">default_labels</span> (Terraform)</span>
+            <span><span style="color:var(--bad)">✕</span> cobertura ≥ 95% do custo</span>
+            <span><span style="color:var(--bad)">✕</span> dono definido por app</span>
+            <span><span style="color:var(--warn)">~</span> recursos manuais (secrets) sem label</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row-2">
+      <div class="card">
+        <h3>Custo alocado por app</h3>
+        <p class="cap">Da fração com label <span class="mono">app</span> (R$ 1,07).</p>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+          <div style="display:flex;align-items:center;gap:10px"><span style="flex:0 0 150px;font-size:12.5px;color:var(--ink-dim)">atlas</span><span class="bar-track" style="flex:1;height:14px"><span class="bar-fill" style="width:100%;background:var(--c-net)"></span></span><span class="mono" style="flex:0 0 52px;text-align:right;font-size:12px">R$ 0,60</span></div>
+          <div style="display:flex;align-items:center;gap:10px"><span style="flex:0 0 150px;font-size:12.5px;color:var(--ink-dim)">polaris-cost-control</span><span class="bar-track" style="flex:1;height:14px"><span class="bar-fill" style="width:50%;background:var(--c-other)"></span></span><span class="mono" style="flex:0 0 52px;text-align:right;font-size:12px">R$ 0,30</span></div>
+          <div style="display:flex;align-items:center;gap:10px"><span style="flex:0 0 150px;font-size:12.5px;color:var(--ink-dim)">observability-hub</span><span class="bar-track" style="flex:1;height:14px"><span class="bar-fill" style="width:28%;background:var(--c-other)"></span></span><span class="mono" style="flex:0 0 52px;text-align:right;font-size:12px">R$ 0,17</span></div>
+        </div>
+        <p class="cap" style="margin-top:8px">Algumas labels de <span class="mono">app</span> ainda apontam para nomes antigos de recurso — a corrigir.</p>
+      </div>
+      <div class="card">
+        <h3>Custo alocado por ambiente</h3>
+        <p class="cap">Da fração com label <span class="mono">environment</span> (R$ 1,10).</p>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+          <div style="display:flex;align-items:center;gap:10px"><span style="flex:0 0 60px;font-size:12.5px;color:var(--ink-dim)">prod</span><span class="bar-track" style="flex:1;height:14px"><span class="bar-fill" style="width:100%;background:var(--c-net)"></span></span><span class="mono" style="flex:0 0 52px;text-align:right;font-size:12px">R$ 0,75</span></div>
+          <div style="display:flex;align-items:center;gap:10px"><span style="flex:0 0 60px;font-size:12.5px;color:var(--ink-dim)">dev</span><span class="bar-track" style="flex:1;height:14px"><span class="bar-fill" style="width:47%;background:var(--c-alt)"></span></span><span class="mono" style="flex:0 0 52px;text-align:right;font-size:12px">R$ 0,35</span></div>
+        </div>
+        <p class="cap" style="margin-top:8px">dev e prod dividem o mesmo projeto GCP — só a label separa.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ EFICIÊNCIA & ECONOMIA ============ -->
+  <section class="panel" id="p-efic" role="tabpanel" aria-labelledby="t-efic" hidden>
+    <header>
+      <span class="eyebrow">Rate + workload optimization</span>
+      <h1 style="font-size:22px">Eficiência &amp; economia</h1>
+      <p>Estamos pagando o mínimo? A este volume o ganho é hábito e governança — as recomendações escalam com o projeto.</p>
+    </header>
+
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
+      <div class="tile"><span class="k">Custo por deploy</span><span class="v">R$ 0,04</span><span class="s">~540 deploys/mês (CI) <span class="chip warn" style="margin-left:4px">config</span></span></div>
+      <div class="tile"><span class="k">Custo por 1k requests</span><span class="v">R$ 0,0006</span><span class="s">Cloud Run · total ÷ requests</span></div>
+      <div class="tile"><span class="k">Custo por GB de log</span><span class="v">R$ 0,00</span><span class="s">dentro do free tier (50 GiB)</span></div>
+      <div class="tile"><span class="k">Custo médio por dia</span><span class="v">R$ 0,88</span><span class="s">média móvel 30 dias</span></div>
+    </div>
+
+    <div class="card">
+      <h3>Do preço de tabela ao custo real</h3>
+      <p class="cap">Acumulado. Cada degrau: preço de tabela → −desconto negociado → −créditos → líquido.</p>
+      <div class="chartwrap">
+        <svg class="chart" viewBox="0 0 440 160" role="img" aria-label="Ponte do preço de tabela ao custo líquido">
+          <line class="axis" x1="20" y1="130" x2="430" y2="130"/>
+          <g font-size="9" text-anchor="middle">
+            <rect x="30"  y="30" width="70" height="100" fill="var(--c-net)" rx="1"/><text x="65"  y="24">R$ 26,41</text><text x="65"  y="146" fill="var(--ink-dim)">preço de tabela</text>
+            <rect x="140" y="30" width="70" height="2"   fill="var(--c-alt)"/><text x="175" y="24">−R$ 0,00</text><text x="175" y="146" fill="var(--ink-dim)">desconto negociado</text>
+            <rect x="250" y="30" width="70" height="6"   fill="var(--c-alt)"/><text x="285" y="24">−R$ 0,57</text><text x="285" y="146" fill="var(--ink-dim)">créditos</text>
+            <rect x="360" y="36" width="70" height="94"  fill="var(--c-net)" rx="1"/><text x="395" y="30">R$ 25,84</text><text x="395" y="146" fill="var(--ink-dim)">custo líquido</text>
+          </g>
+        </svg>
+      </div>
+      <p class="cap" style="margin-top:6px">Taxa de economia efetiva = 1 − líquido / preço de tabela.</p>
+    </div>
+
+    <div class="row-2">
+      <div class="card">
+        <div class="tile" style="border:0;padding:0"><span class="k">Custo evitado (acumulado)</span><span class="v">R$ 0,00</span><span class="s">sem CUD / SUD / negociação nesta billing account</span></div>
+      </div>
+      <div class="card">
+        <h3>Cobertura de compromissos</h3>
+        <div style="display:flex;align-items:center;gap:16px;margin-top:8px">
+          <svg viewBox="0 0 80 80" style="width:80px;height:80px" aria-hidden="true">
+            <circle cx="40" cy="40" r="30" fill="none" stroke="var(--well)" stroke-width="9"/>
+            <circle cx="40" cy="40" r="30" fill="none" stroke="var(--c-alt)" stroke-width="9" stroke-dasharray="188" stroke-dashoffset="188" transform="rotate(-90 40 40)"/>
+          </svg>
+          <div><span class="mono" style="font-weight:700;font-size:22px">0%</span><div style="font-size:12px;color:var(--ink-dim)">100% on-demand</div></div>
+        </div>
+        <div class="callout" style="margin-top:10px"><span aria-hidden="true">◆</span><span>CUD/SUD não compensa abaixo de ~R$ 30/mês de gasto estável; reavaliar quando o gasto sustentado subir.</span></div>
+      </div>
+    </div>
+
+    <div class="row-2">
+      <div class="card">
+        <h3>Eficiência do Cloud Run</h3>
+        <table class="datatable" style="margin-top:8px"><tbody>
+          <tr><td>Custo por vCPU·s</td><td class="num">R$ 0,0000151</td></tr>
+          <tr><td>Custo por GiB·s</td><td class="num">R$ 0,0000023</td></tr>
+          <tr><td>Razão CPU : memória</td><td class="num">76 : 24</td></tr>
+        </tbody></table>
+      </div>
+      <div class="card">
+        <h3>Custo por request · por dia</h3>
+        <p class="cap">Custo por 1k requests ao longo do tempo (regressão de eficiência aparece como subida).</p>
+        <div class="chartwrap">
+          <svg class="chart" viewBox="0 0 340 120" role="img" aria-label="Tendência do custo por mil requests">
+            <line class="axis" x1="20" y1="96" x2="330" y2="96"/>
+            <path d="M20,70 L70,66 L120,72 L170,68 L220,70 L270,67 L330,69" fill="none" stroke="var(--c-net)" stroke-width="2"/>
+            <text x="20" y="112" font-size="9">30/ago</text><text x="330" y="112" text-anchor="end" font-size="9">08/set</text>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+        <h3>Recomendações</h3>
+        <span class="tile" style="border:0;padding:0;text-align:right"><span class="k">Economia potencial</span><span class="v" style="font-size:18px">R$ 4–7</span><span class="s">/mês · 15–27% do run-rate</span></span>
+      </div>
+      <p class="cap">Lista curada, revisada periodicamente (não vem do billing export). <span class="chip warn">curado</span></p>
+      <table class="datatable" style="margin-top:8px"><thead><tr><th>Ação</th><th>Evidência</th><th>Economia est./mês</th><th>Esforço</th></tr></thead><tbody>
+        <tr><td>Escalar Cloud Run dev a zero fora do horário</td><td style="text-align:left;font-size:12px;color:var(--ink-dim)">backend-dev / frontend-dev com min-instances=1 24/7; tráfego só em horário comercial</td><td class="num">R$ 2–4</td><td>baixo</td></tr>
+        <tr><td>CPU only-on-request em serviços de baixa carga</td><td style="text-align:left;font-size:12px;color:var(--ink-dim)">CPU always-allocated paga vCPU·s ocioso; R$ 16 de R$ 21,81 é CPU Allocation Time</td><td class="num">R$ 1–2</td><td>baixo</td></tr>
+        <tr><td>Política de limpeza no Artifact Registry</td><td style="text-align:left;font-size:12px;color:var(--ink-dim)">imagens antigas sem tag de release; manter só as últimas 10 por repo</td><td class="num">R$ 0,30</td><td>baixo</td></tr>
+        <tr><td>Retenção do log bucket _Default em dev</td><td style="text-align:left;font-size:12px;color:var(--ink-dim)">hoje R$ 0 (free tier), mas 30d de retenção; 7d em dev é preventivo</td><td class="num">preventivo</td><td>baixo</td></tr>
+        <tr><td>Budget por label app / environment</td><td style="text-align:left;font-size:12px;color:var(--ink-dim)">dev e prod dividem o projeto sem orçamento separado; sem label obrigatória não dá pra alertar por app</td><td class="num">governança</td><td>médio</td></tr>
+      </tbody></table>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <b>mock visual · 6 abas</b> · dp6-billing-platform/mock · dados: validação de 2026-09-09 (R$ 26,41 em ~2 meses) ·
+  <b>não é o app</b> — referência para <b>specs/005-telas.md</b> e <b>apps/web/</b> · DP6 Design System (dark por padrão)
+</footer>
+
+<div class="tooltip" id="tt"></div>
+
+<script>
+"use strict";
+/* ================= dados (validação 2026-09-09) ================= */
+const CUR = {rate:5.8703}; // taxa BRL/USD do mês corrente
+const brl = v => "R$ " + v.toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
+const usd = v => "US$ " + (v/CUR.rate).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
+const pct = v => (v>=0?"+":"") + v.toLocaleString("pt-BR",{minimumFractionDigits:1,maximumFractionDigits:1}) + "%";
+
+// custo líquido diário (R$), 2026-08-10 .. 2026-09-09
+const DAILY = [
+  ["08-10",0],["08-11",0],["08-12",0],["08-13",0],["08-14",0],["08-15",0],["08-16",0],["08-17",0],["08-18",0],["08-19",0],
+  ["08-20",0.20],["08-21",5.29],["08-22",3.08],["08-23",0.27],["08-24",4.59],["08-25",6.20],["08-26",2.01],["08-27",0.21],
+  ["08-28",0.97],["08-29",0.17],["08-30",0.17],["08-31",0.40],
+  ["09-01",0.16],["09-02",0.20],["09-03",0.19],["09-04",0.41],["09-05",0.29],["09-06",0.31],["09-07",0.26],["09-08",0.29],["09-09",0.15]
+];
+const SERVICES = [
+  ["Cloud Run",21.81],["BigQuery",1.75],["Secret Manager",1.57],
+  ["Artifact Registry",0.77],["Cloud Scheduler",0.50],["Cloud Storage",0.01]
+];
+const MONTHS = [ // mês, cloud run, bigquery, outros, gross, credits, net
+  {m:"jul/26", cr:0,      bq:0,    ot:0,    gross:0,     cred:0,     net:0},
+  {m:"ago/26", cr:20.28,  bq:1.44, ot:1.93, gross:23.65, cred:0,     net:23.65},
+  {m:"set/26", cr:0.86,   bq:0.02, ot:1.31, gross:2.75,  cred:-0.57, net:2.19}
+];
+const PACE = { // acúmulo por dia-do-mês
+  ago:[0,0.20,5.49,8.57,8.84,13.43,19.63,21.64,21.85,22.82,22.99,23.16,23.65],
+  set:[0,0.16,0.36,0.55,0.96,1.25,1.56,1.82,2.11,2.19]
+};
+const SKU = [ // Cloud Run, período
+  ["CPU Allocation Time","vCPU·s",  "1.06M", 0.62],
+  ["Memory Allocation Time","GiB·s","2.13M", 0.19],
+  ["Requests","1k req",             "48.2",  0.03],
+  ["Egress (América do Sul)","GiB", "0.14",  0.02]
+];
+const UNIT = [ // sku, uso, unidade, custo unit, custo
+  ["Cloud Run · CPU Allocation Time","1.06M","vCPU·s","R$ 0,00000058","R$ 0,62"],
+  ["Cloud Run · Memory Allocation Time","2.13M","GiB·s","R$ 0,00000009","R$ 0,19"],
+  ["BigQuery · Analysis","0.20","TiB","R$ 8,75","R$ 1,75"],
+  ["Secret Manager · Access operations","3.1M","10k ops","R$ 0,0051","R$ 1,57"],
+  ["Artifact Registry · Storage","0.11","GiB·mês","R$ 7,00","R$ 0,77"]
+];
+const ANOM = [
+  {date:"2026-08-25", svc:"Cloud Run", val:5.68, avg:0.46, z:4.1,
+   spark:[0.20,5.15,2.80,0.18,4.18,5.68,1.67,0.06,0.41,0.01,0.01,0.15,0.08,0.06,0.23,0.10,0.09,0.10,0.03,0.04,0.04,0.09,0.09,0.10,0.04,0.04,0.04,0.04,0.04,0.04], hi:5},
+  {date:"2026-08-21", svc:"Cloud Run", val:5.15, avg:0.42, z:3.7,
+   spark:[0,0,0,0,0,0,0,0,0,0,0.20,5.15,2.80,0.18,4.18,5.68,1.67,0.06,0.41,0.01,0.01,0.15,0.08,0.06,0.23,0.10,0.09,0.10,0.03,0.04], hi:11}
+];
+const COVERAGE = [["managed-by",0.10],["app",0.04],["environment",0.04]];
+
+const SVGNS="http://www.w3.org/2000/svg";
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function el(tag,attrs,parent){const e=document.createElementNS(SVGNS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e;}
+
+/* ================= tooltip ================= */
+const tt=document.getElementById("tt");
+function showTT(html,x,y){tt.innerHTML=html;tt.style.opacity="1";tt.style.left=(x+14)+"px";tt.style.top=(y+14)+"px";}
+function hideTT(){tt.style.opacity="0";}
+
+/* ================= scorecard ================= */
+function scorecard(){
+  const netWin=2.26, prevWin=25.82, runRate=2.19/9*30, credits=-0.57, budget=20, netMtd=2.19;
+  const usedPct=netMtd/budget*100, rrPct=runRate/budget*100;
+  const fixo=[
+    {k:"Custo vs. orçamento", v:`<span class="mono">${usedPct.toLocaleString("pt-BR",{maximumFractionDigits:1})}%</span>`, s:`de <span class="mono">${brl(budget)}</span> · run-rate ${rrPct.toLocaleString("pt-BR",{maximumFractionDigits:1})}%`,
+     extra:`<span class="chip ${rrPct<=100?'ok':'warn'}">${rrPct<=100?'✓ dentro do orçamento':'▲ acima no ritmo atual'}</span><div class="bar-track"><div class="bar-fill" style="width:${Math.max(usedPct,1.5)}%"></div></div>`},
+    {k:"Run-rate fim de mês", v:brl(runRate), s:`projeção linear · 9 de 30 dias`}
+  ];
+  const periodo=[
+    {k:"Custo líquido", v:brl(netWin), s:`<span class="mono">${usd(netWin)}</span>`},
+    {k:"Δ vs. período anterior", v:`<span class="mono">${pct(netWin/prevWin*100-100)}</span>`, s:`anterior <span class="mono">${brl(prevWin)}</span>`, cls:"delta-down"},
+    {k:"Créditos", v:brl(credits), s:`créditos aplicados no período`},
+    {k:"Economia efetiva", v:`<span class="mono">2,1%</span>`, s:`1 − líquido / bruto (só créditos)`}
+  ];
+  const tile=c=>`<div class="tile"><span class="k">${c.k}</span><span class="v ${c.cls||''}">${c.v}</span><span class="s">${c.s}</span>${c.extra||''}</div>`;
+  document.getElementById("scorecard").innerHTML=`
+    <div><span class="sc-eyebrow">Mês corrente · fixo</span>
+      <div class="grid" style="grid-template-columns:repeat(2,1fr)">${fixo.map(tile).join("")}</div></div>
+    <div><span class="sc-eyebrow">Período · 12/08 a 09/09</span>
+      <div class="grid" style="grid-template-columns:repeat(4,1fr)">${periodo.map(tile).join("")}</div></div>`;
+}
+
+/* ================= temporal: barras diárias + linha acumulativa + média 7d ================= */
+function dailyChart(){
+  const host=document.getElementById("c-daily");
+  const W=680,H=220,P={t:14,r:44,b:26,l:44};
+  const data=DAILY.map(d=>d[1]);
+  const max=Math.ceil(Math.max(...data));
+  let acc=0; const cum=data.map(v=>acc+=v); const cumMax=Math.ceil(cum[cum.length-1]);
+  const ma=data.map((_,i)=>{const s=data.slice(Math.max(0,i-6),i+1);return s.reduce((a,b)=>a+b,0)/s.length;});
+  const iw=(W-P.l-P.r)/data.length;
+  const x=i=>P.l+i*iw+iw/2;
+  const y=v=>H-P.b-(v/max)*(H-P.t-P.b);
+  const yc=v=>H-P.b-(v/cumMax)*(H-P.t-P.b);
+  const svg=el("svg",{class:"chart",viewBox:`0 0 ${W} ${H}`,role:"img","aria-label":"Custo por dia em barras com linha de acumulado"},host);
+  for(let t=0;t<=max;t+=1){const yy=y(t);el("line",{class:"tickline",x1:P.l,x2:W-P.r,y1:yy,y2:yy,opacity:t?.5:1},svg);
+    const tx=el("text",{x:P.l-8,y:yy+4,"text-anchor":"end","font-size":"10"},svg);tx.textContent="R$ "+t;}
+  el("text",{x:W-P.r+8,y:P.t+4,"font-size":"9",fill:css("--ink-dim")},svg).textContent="acum.";
+  DAILY.forEach((d,i)=>{if(i%5)return;const tx=el("text",{x:x(i),y:H-8,"text-anchor":"middle","font-size":"10"},svg);tx.textContent=d[0];});
+  // barras
+  data.forEach((v,i)=>{if(v<=0)return;const h=y(0)-y(v);el("rect",{x:P.l+i*iw+2,y:y(v),width:Math.max(iw-4,1),height:Math.max(h,0),fill:css("--c-net"),rx:"1"},svg);});
+  // média móvel
+  let dMa="";ma.forEach((v,i)=>dMa+=(i?" L":"M")+x(i)+","+y(v));
+  el("path",{d:dMa,fill:"none",stroke:css("--c-other"),"stroke-width":"1.5","stroke-dasharray":"4 3"},svg);
+  // acumulado (eixo direito)
+  let dCum="";cum.forEach((v,i)=>dCum+=(i?" L":"M")+x(i)+","+yc(v));
+  el("path",{d:dCum,fill:"none",stroke:css("--c-net"),"stroke-width":"2"},svg);
+  el("circle",{cx:x(cum.length-1),cy:yc(cum[cum.length-1]),r:"3.5",fill:css("--c-net"),stroke:css("--well"),"stroke-width":"1.5"},svg);
+}
+
+/* ================= barras horizontais: serviços ================= */
+function servicesChart(){
+  const host=document.getElementById("c-services");
+  const max=SERVICES[0][1];
+  host.innerHTML=SERVICES.map(([n,v],i)=>{
+    const w=Math.max(v/max*100,0.6);
+    const col=i===0?css("--c-net"):(i===1?css("--c-alt"):css("--c-other"));
+    return `<div style="display:flex;align-items:center;gap:10px;margin:7px 0" data-svc="${n}" data-v="${v}">
+      <span style="flex:0 0 116px;font-size:12.5px;color:var(--ink-dim)">${n}</span>
+      <span style="flex:1;height:16px;background:var(--well);border-radius:3px;overflow:hidden">
+        <span style="display:block;height:100%;width:${w}%;background:${col};border-radius:0 3px 3px 0"></span></span>
+      <span class="mono" style="flex:0 0 62px;text-align:right;font-size:12.5px">${brl(v)}</span>
+    </div>`;
+  }).join("");
+  host.querySelectorAll("[data-svc]").forEach(r=>{
+    r.addEventListener("pointerenter",ev=>showTT(`<b>${r.dataset.svc}</b><br>${brl(+r.dataset.v)} · ${(r.dataset.v/26.41*100).toFixed(1)}%`,ev.clientX,ev.clientY));
+    r.addEventListener("pointermove",ev=>showTT(`<b>${r.dataset.svc}</b><br>${brl(+r.dataset.v)} · ${(r.dataset.v/26.41*100).toFixed(1)}%`,ev.clientX,ev.clientY));
+    r.addEventListener("pointerleave",hideTT);
+  });
+  document.getElementById("tbl-services").innerHTML=`<table class="datatable"><thead><tr><th>Serviço</th><th>Custo</th><th>% do total</th></tr></thead><tbody>${
+    SERVICES.map(([n,v])=>`<tr><td>${n}</td><td class="num">${brl(v)}</td><td class="num">${(v/26.41*100).toFixed(1)}%</td></tr>`).join("")
+  }</tbody></table>`;
+}
+
+/* ================= reconciliação ================= */
+function recon(){
+  const host=document.getElementById("recon");
+  const max=25;
+  host.innerHTML=MONTHS.map(m=>{
+    const g=Math.max(m.gross/max*100,0.4), c=Math.abs(m.cred)/max*100;
+    return `<div class="recon-row">
+      <span class="m">${m.m}</span>
+      <span class="recon-bar" title="bruto ${brl(m.gross)} · créditos ${brl(m.cred)}">
+        <i style="width:${g}%;background:${css('--c-net')}"></i>
+        <i style="width:${c}%;background:${css('--c-credit')}"></i>
+      </span>
+      <span class="val">${brl(m.net)}</span>
+      <span class="chip ok" style="justify-self:end">✓ bate</span>
+    </div>`;
+  }).join("");
+}
+
+/* ================= tendência: empilhado mensal ================= */
+function monthlyChart(){
+  const host=document.getElementById("c-monthly");
+  const W=680,H=220,P={t:14,r:14,b:28,l:44};
+  const max=25;
+  const bw=64, gap=(W-P.l-P.r-bw*3)/3;
+  const y=v=>H-P.b-(v/max)*(H-P.t-P.b);
+  const svg=el("svg",{class:"chart",viewBox:`0 0 ${W} ${H}`,role:"img","aria-label":"Custo líquido mensal empilhado por serviço"},host);
+  for(let t=0;t<=25;t+=5){const yy=y(t);el("line",{class:"tickline",x1:P.l,x2:W-P.r,y1:yy,y2:yy,opacity:t?.5:1},svg);
+    const tx=el("text",{x:P.l-8,y:yy+4,"text-anchor":"end","font-size":"10"},svg);tx.textContent="R$ "+t;}
+  MONTHS.forEach((m,i)=>{
+    const bx=P.l+gap/2+i*(bw+gap);
+    const segs=[["cr",css("--c-net")],["bq",css("--c-alt")],["ot",css("--c-other")]];
+    let acc=0;
+    segs.forEach(([key,col])=>{
+      const v=m[key]; if(v<=0){return;}
+      const y0=y(acc), y1=y(acc+v);
+      el("rect",{x:bx,y:y1,width:bw,height:Math.max(y0-y1-2,0),fill:col,rx:"1"},svg);
+      acc+=v;
+    });
+    const tx=el("text",{x:bx+bw/2,y:H-10,"text-anchor":"middle","font-size":"10.5"},svg);tx.textContent=m.m;
+    if(m.net>0){const vt=el("text",{x:bx+bw/2,y:y(m.net)-6,"text-anchor":"middle","font-size":"11",style:"fill:"+css("--ink")},svg);vt.textContent=brl(m.net);}
+  });
+  document.getElementById("lg-monthly").innerHTML=[
+    ["Cloud Run",css("--c-net")],["BigQuery",css("--c-alt")],["Outros",css("--c-other")]
+  ].map(([n,c])=>`<span><i class="swatch" style="background:${c}"></i>${n}</span>`).join("");
+}
+
+/* ================= tendência: Δ MoM ================= */
+function momChart(){
+  const host=document.getElementById("c-mom");
+  const W=340,H=200,P={t:16,r:14,b:28,l:40};
+  const bars=[{m:"ago/26",v:23.65,ghost:null},{m:"set/26",v:2.19,ghost:7.30}];
+  const max=25;
+  const y=v=>H-P.b-(v/max)*(H-P.t-P.b);
+  const bw=54, gap=(W-P.l-P.r-bw*2)/2;
+  const svg=el("svg",{class:"chart",viewBox:`0 0 ${W} ${H}`,role:"img","aria-label":"Variação mês a mês do custo líquido"},host);
+  for(let t=0;t<=25;t+=5){const yy=y(t);el("line",{class:"tickline",x1:P.l,x2:W-P.r,y1:yy,y2:yy,opacity:t?.5:1},svg);
+    const tx=el("text",{x:P.l-8,y:yy+4,"text-anchor":"end","font-size":"10"},svg);tx.textContent=t;}
+  bars.forEach((b,i)=>{
+    const bx=P.l+gap/2+i*(bw+gap);
+    if(b.ghost){el("rect",{x:bx,y:y(b.ghost),width:bw,height:y(0)-y(b.ghost),fill:"none",stroke:css("--c-net"),"stroke-width":"1.5","stroke-dasharray":"3 3",rx:"1"},svg);
+      const gt=el("text",{x:bx+bw/2,y:y(b.ghost)-6,"text-anchor":"middle","font-size":"10",fill:css("--ink-dim")},svg);gt.textContent="run-rate "+brl(b.ghost);}
+    el("rect",{x:bx,y:y(b.v),width:bw,height:y(0)-y(b.v),fill:css("--c-net"),rx:"1"},svg);
+    const tx=el("text",{x:bx+bw/2,y:H-10,"text-anchor":"middle","font-size":"10.5"},svg);tx.textContent=b.m;
+    const vt=el("text",{x:bx+bw/2,y:y(b.v)+(b.v>5?14:-6),"text-anchor":"middle","font-size":"10.5",style:"fill:"+(b.v>5?"#fff":css("--ink"))},svg);vt.textContent=brl(b.v);
+  });
+  const dt=el("text",{x:W-P.r,y:P.t+2,"text-anchor":"end","font-size":"11",style:"fill:"+css("--ok")},svg);
+  dt.textContent="Δ −90,7% (realizado MTD)";
+}
+
+/* ================= tendência: pace acumulado ================= */
+function paceChart(){
+  const host=document.getElementById("c-pace");
+  const W=340,H=200,P={t:14,r:14,b:26,l:40};
+  const max=25, days=13;
+  const x=i=>P.l+i*(W-P.l-P.r)/(days-1);
+  const y=v=>H-P.b-(v/max)*(H-P.t-P.b);
+  const svg=el("svg",{class:"chart",viewBox:`0 0 ${W} ${H}`,role:"img","aria-label":"Acúmulo diário: setembro versus agosto"},host);
+  for(let t=0;t<=25;t+=5){const yy=y(t);el("line",{class:"tickline",x1:P.l,x2:W-P.r,y1:yy,y2:yy,opacity:t?.5:1},svg);
+    const tx=el("text",{x:P.l-8,y:yy+4,"text-anchor":"end","font-size":"10"},svg);tx.textContent=t;}
+  [4,8,12].forEach(i=>{const tx=el("text",{x:x(i),y:H-8,"text-anchor":"middle","font-size":"10"},svg);tx.textContent="dia "+(i+1);});
+  const draw=(arr,col,dash)=>{let d="";arr.forEach((v,i)=>d+=(i?" L":"M")+x(i)+","+y(v));
+    el("path",{d,fill:"none",stroke:col,"stroke-width":"2",...(dash?{"stroke-dasharray":"4 3"}:{})},svg);};
+  draw(PACE.ago,css("--c-other"),true);
+  draw(PACE.set,css("--c-net"),false);
+  el("circle",{cx:x(PACE.set.length-1),cy:y(PACE.set.at(-1)),r:"3.5",fill:css("--c-net"),stroke:css("--well"),"stroke-width":"1.5"},svg);
+  const l1=el("text",{x:x(12),y:y(PACE.ago[12])-6,"text-anchor":"end","font-size":"10"},svg);l1.textContent="ago";
+  const l2=el("text",{x:x(9)+6,y:y(PACE.set.at(-1))-2,"font-size":"10",style:"fill:"+css("--c-net")},svg);l2.textContent="set (MTD)";
+}
+
+/* ================= serviços & SKUs ================= */
+function skuChart(){
+  const host=document.getElementById("c-sku");
+  const max=SKU[0][3];
+  host.innerHTML=`<div style="font-size:12.5px;color:var(--ink-dim);margin-bottom:4px">Cloud Run — <span class="mono">${brl(0.86)}</span> no período</div>`+
+   SKU.map(([n,u,q,v])=>{
+    const w=Math.max(v/max*100,1);
+    return `<div style="display:flex;align-items:center;gap:10px;margin:6px 0 6px 14px">
+      <span style="flex:0 0 190px;font-size:12.5px">${n} <span class="mono" style="color:var(--ink-mute);font-size:11px">${q} ${u}</span></span>
+      <span style="flex:1;height:14px;background:var(--well);border-radius:3px;overflow:hidden">
+        <span style="display:block;height:100%;width:${w}%;background:${css('--c-net')}"></span></span>
+      <span class="mono" style="flex:0 0 58px;text-align:right;font-size:12px">${brl(v)}</span>
+    </div>`;
+  }).join("");
+  document.getElementById("tbl-unit").innerHTML=`<table class="datatable"><thead><tr><th>SKU</th><th>Uso</th><th>Unid.</th><th>Custo unit.</th><th>Custo</th></tr></thead><tbody>${
+    UNIT.map(r=>`<tr><td>${r[0]}</td><td class="num">${r[1]}</td><td>${r[2]}</td><td class="num">${r[3]}</td><td class="num">${r[4]}</td></tr>`).join("")
+  }</tbody></table>`;
+}
+
+/* ================= anomalias ================= */
+function anomList(){
+  const host=document.getElementById("anom-list");
+  host.innerHTML=ANOM.map(a=>{
+    const W=220,H=44,mx=Math.max(...a.spark);
+    const x=i=>2+i*(W-4)/(a.spark.length-1), y=v=>H-3-(v/mx)*(H-8);
+    let d="";a.spark.forEach((v,i)=>d+=(i?" L":"M")+x(i).toFixed(1)+","+y(v).toFixed(1));
+    return `<div style="display:grid;grid-template-columns:96px 1fr 230px;gap:16px;align-items:center;padding:12px 0;border-bottom:1px solid var(--hair)">
+      <div><div class="mono" style="font-size:13px;font-weight:700">${a.date.slice(5)}</div><div style="font-size:11px;color:var(--ink-mute)">${a.date.slice(0,4)}</div></div>
+      <div>
+        <div style="font-size:13.5px">${a.svc} · <span class="mono" style="font-weight:700">${brl(a.val)}</span>
+          <span class="chip bad" style="margin-left:6px">z ${a.z.toLocaleString("pt-BR",{minimumFractionDigits:1})}</span></div>
+        <div style="font-size:12px;color:var(--ink-dim)">média 28d <span class="mono">${brl(a.avg)}</span> · desvio <span class="mono">${brl(a.val-a.avg)}</span> (${((a.val/a.avg-1)*100).toFixed(0)}%)</div>
+      </div>
+      <svg viewBox="0 0 ${W} ${H}" style="width:230px;height:44px" aria-hidden="true">
+        <path d="${d}" fill="none" stroke="${css('--c-net')}" stroke-width="1.5"/>
+        <circle cx="${x(a.hi).toFixed(1)}" cy="${y(a.spark[a.hi]).toFixed(1)}" r="3.2" fill="${css('--c-alert')}"/>
+      </svg>
+    </div>`;
+  }).join("");
+}
+
+/* ================= showback: cobertura ================= */
+function coverageChart(){
+  const host=document.getElementById("c-coverage");
+  host.innerHTML=COVERAGE.map(([k,v])=>{
+    const R=26,C=2*Math.PI*R, off=C*(1-v);
+    return `<div style="display:inline-flex;flex-direction:column;align-items:center;gap:6px;margin:6px 22px 6px 0">
+      <svg viewBox="0 0 64 64" style="width:64px;height:64px" aria-hidden="true">
+        <circle cx="32" cy="32" r="${R}" fill="none" stroke="${css('--well')}" stroke-width="8"/>
+        <circle cx="32" cy="32" r="${R}" fill="none" stroke="${css('--c-net')}" stroke-width="8"
+          stroke-dasharray="${C}" stroke-dashoffset="${off}" transform="rotate(-90 32 32)" stroke-linecap="butt"/>
+      </svg>
+      <span class="mono" style="font-weight:700;font-size:15px">${(v*100).toFixed(0)}%</span>
+      <span style="font-size:11.5px;color:var(--ink-dim)">${k}</span>
+    </div>`;
+  }).join("")+"";
+}
+
+/* ================= tabs ================= */
+const tabs=[...document.querySelectorAll('.tab')];
+const panels=Object.fromEntries([...document.querySelectorAll('.panel')].map(p=>[p.id,p]));
+tabs.forEach(t=>t.addEventListener('click',()=>{
+  tabs.forEach(x=>x.setAttribute('aria-selected',x===t));
+  for(const id in panels)panels[id].hidden=(panels[id]!==panels[t.getAttribute('aria-controls')]);
+  window.scrollTo({top:0,behavior:'instant'});
+}));
+tabs.forEach((t,i)=>t.addEventListener('keydown',e=>{
+  if(e.key!=='ArrowRight'&&e.key!=='ArrowLeft')return;
+  e.preventDefault();const n=(i+(e.key==='ArrowRight'?1:tabs.length-1))%tabs.length;tabs[n].focus();tabs[n].click();
+}));
+
+/* ================= toggle tabela ================= */
+document.querySelectorAll('.toggle-tbl').forEach(b=>b.addEventListener('click',()=>{
+  const t=document.getElementById(b.dataset.target);const open=t.hidden;
+  t.hidden=!open;b.setAttribute('aria-expanded',String(open));b.textContent=open?'Ocultar tabela':'Ver tabela';
+}));
+
+/* ================= tema ================= */
+const root=document.documentElement;
+/* dark é o padrão; só persiste "light" (espelha apps/web/src/lib/useTheme.ts). */
+function applyTheme(mode){
+  root.setAttribute('data-theme',mode);
+  try{mode==='light'?localStorage.setItem('pcm:theme','light'):localStorage.removeItem('pcm:theme');}catch(e){}
+  renderAll();
+}
+try{root.setAttribute('data-theme',localStorage.getItem('pcm:theme')==='light'?'light':'dark');}
+catch(e){root.setAttribute('data-theme','dark');}
+document.getElementById('themeBtn').addEventListener('click',()=>{
+  applyTheme(root.getAttribute('data-theme')==='dark'?'light':'dark');
+});
+
+/* ================= render ================= */
+function renderAll(){
+  scorecard();
+  document.getElementById('c-daily').innerHTML='';dailyChart();
+  servicesChart(); recon();
+  document.getElementById('c-monthly').innerHTML='';monthlyChart();
+  document.getElementById('c-mom').innerHTML='';momChart();
+  document.getElementById('c-pace').innerHTML='';paceChart();
+  skuChart(); anomList(); coverageChart();
+}
+renderAll();
+</script>
+</body>
+</html>

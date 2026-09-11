@@ -1,0 +1,120 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&family=Ubuntu+Mono:wght@400;700&display=swap">
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Ubuntu,"Segoe UI",system-ui,sans-serif;background:#fcfcfb;color:#1d1d1b;font-size:15px;line-height:1.55}
+  h1,h2,h3{margin:0;font-weight:500;letter-spacing:-.01em}
+  .mono{font-family:"Ubuntu Mono",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
+  .eyebrow{font:500 11px/1.4 Ubuntu,sans-serif;letter-spacing:.22em;text-transform:uppercase;color:#5b626c}
+  a{color:#1a365d}a:hover{color:#0f2136}
+  table.dt{width:100%;border-collapse:collapse;font-size:13px}
+  table.dt th,table.dt td{padding:10px;border-bottom:1px solid #e7e3d8;text-align:left;vertical-align:top}
+  table.dt thead th{font:500 10px/1.4 Ubuntu,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#5b626c;border-bottom-color:#d8d3c4}
+  table.dt tr:last-child td{border-bottom:0}
+</style>
+</helmet>
+
+<div style="width:1440px;background:#fcfcfb">
+
+  <div style="display:flex;align-items:center;gap:12px;height:52px;padding:0 28px;background:#1d1d1b;color:#f2f1ec">
+    <svg width="24" height="16" viewBox="0 0 26 18" aria-hidden="true"><path d="M2 18 L2 12 L7 10 L7 18 Z" fill="#ffb302"/><path d="M10 18 L10 7 L15 5 L15 18 Z" fill="#ffb302"/><path d="M18 18 L18 2 L23 0 L23 18 Z" fill="#ffb302"/></svg>
+    <span style="font-weight:500">CI Polaris</span><span style="color:#a7abb0;font-size:13px">· controle de custo</span>
+    <span style="flex:1"></span>
+    <span class="mono" style="font-size:11px;border:1px solid #4a4a44;border-radius:999px;padding:4px 9px;color:#d9d6cc">amostra · validação 2026-09-09</span>
+  </div>
+
+  <div style="display:flex;gap:0;padding:0 20px;border-bottom:1px solid #e7e3d8;background:#fcfcfb;font-size:13.5px">
+    <span style="padding:13px 12px 11px;color:#5b626c">Visão geral</span>
+    <span style="padding:13px 12px 11px;color:#5b626c">Orçamento</span>
+    <span style="padding:13px 12px 11px;color:#5b626c">Tendência</span>
+    <span style="padding:13px 12px 11px;color:#5b626c">Alocação</span>
+    <span style="padding:13px 12px 11px;color:#5b626c">Serviços &amp; SKUs</span>
+    <span style="padding:13px 12px 11px;color:#1d1d1b;border-bottom:2px solid #ffb302;font-weight:500">Otimização</span>
+    <span style="padding:13px 12px 11px;color:#5b626c">Unit economics</span>
+    <span style="padding:13px 12px 11px;color:#5b626c">Anomalias</span>
+  </div>
+
+  <div style="padding:24px 28px 36px;display:flex;flex-direction:column;gap:20px">
+
+    <div style="display:flex;flex-direction:column;gap:3px">
+      <span class="eyebrow">Oportunidades de otimização</span>
+      <h1 style="font-size:22px">Otimização &amp; waste</h1>
+      <p style="margin:0;color:#5b626c;font-size:13.5px;max-width:74ch">Rate optimization (compromissos) e workload optimization (rightsizing, desperdício). A este volume o ganho é hábito e governança — as recomendações escalam com o projeto.</p>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr 1.4fr;gap:14px">
+      <div style="background:#fff;border:1px solid #e7e3d8;border-radius:8px;padding:18px;display:flex;flex-direction:column;align-items:center;gap:8px">
+        <span style="font:500 10px/1.3 Ubuntu;letter-spacing:.14em;text-transform:uppercase;color:#5b626c;align-self:flex-start">Cobertura de compromissos</span>
+        <svg viewBox="0 0 90 60" style="width:120px;height:80px">
+          <path d="M8 54 A37 37 0 0 1 82 54" fill="none" stroke="#f4f1ea" stroke-width="9" stroke-linecap="round"/>
+          <circle cx="8" cy="54" r="3" fill="#8a8f96"/>
+        </svg>
+        <span class="mono" style="font-weight:700;font-size:22px">0%</span>
+        <span style="font-size:11.5px;color:#5b626c;text-align:center">100% on-demand</span>
+      </div>
+      <div style="background:#fff;border:1px solid #e7e3d8;border-radius:8px;padding:18px;display:flex;flex-direction:column;gap:6px">
+        <span style="font:500 10px/1.3 Ubuntu;letter-spacing:.14em;text-transform:uppercase;color:#5b626c">Economia potencial</span>
+        <span class="mono" style="font-weight:700;font-size:24px;letter-spacing:-.02em;color:#059669">R$ 4–7</span>
+        <span style="font-size:12px;color:#5b626c">por mês · 15–27% do run-rate</span>
+        <span style="font-size:11.5px;color:#8b9099;margin-top:2px">soma das recomendações de baixo esforço</span>
+      </div>
+      <div style="background:#f4f1ea;border:1px solid #e7e3d8;border-left:2px solid #ffb302;border-radius:8px;padding:18px;font-size:12.5px;color:#5b626c;display:flex;align-items:center">
+        CUD / SUD não recomendado abaixo de ~<span class="mono">&nbsp;R$ 30/mês&nbsp;</span> de gasto estável — o desconto não compensa o compromisso de 1 ano. Reavaliar quando o Cloud Run passar de <span class="mono">&nbsp;R$ 50/mês&nbsp;</span> sustentado.
+      </div>
+    </div>
+
+    <div style="background:#fff;border:1px solid #e7e3d8;border-radius:8px;padding:20px">
+      <h3 style="font-size:15px">Recomendações</h3>
+      <table class="dt" style="margin-top:8px">
+        <thead><tr><th style="width:26%">Ação</th><th style="width:40%">Evidência</th><th style="width:16%;text-align:right">Economia est./mês</th><th style="width:12%">Esforço</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Escalar Cloud Run <span class="mono">dev</span> a zero fora do horário</td>
+            <td style="color:#5b626c">Serviços <span class="mono">backend-dev</span>/<span class="mono">frontend-dev</span> com <span class="mono">min-instances=1</span> 24/7; tráfego só em horário comercial.</td>
+            <td class="mono" style="text-align:right;color:#059669">R$ 2–4</td>
+            <td><span style="background:rgba(5,150,105,.14);color:#059669;border-radius:999px;padding:2px 8px;font-size:11px">baixo</span></td>
+          </tr>
+          <tr>
+            <td>CPU <span class="mono">only-on-request</span> em serviços de baixa carga</td>
+            <td style="color:#5b626c">CPU always-allocated paga por vCPU·s ocioso; a maior parte do custo é <span class="mono">CPU Allocation Time</span> (R$ 16 de R$ 21,81).</td>
+            <td class="mono" style="text-align:right;color:#059669">R$ 1–2</td>
+            <td><span style="background:rgba(5,150,105,.14);color:#059669;border-radius:999px;padding:2px 8px;font-size:11px">baixo</span></td>
+          </tr>
+          <tr>
+            <td>Política de limpeza no Artifact Registry</td>
+            <td style="color:#5b626c">Imagens antigas sem tag de release acumulam storage; manter só as últimas 10 por repositório.</td>
+            <td class="mono" style="text-align:right;color:#059669">R$ 0,30</td>
+            <td><span style="background:rgba(5,150,105,.14);color:#059669;border-radius:999px;padding:2px 8px;font-size:11px">baixo</span></td>
+          </tr>
+          <tr>
+            <td>Retenção do log bucket <span class="mono">_Default</span> em dev</td>
+            <td style="color:#5b626c">Hoje R$ 0 (dentro do free tier), mas 30d de retenção; 7d em dev é preventivo antes do volume subir.</td>
+            <td class="mono" style="text-align:right;color:#5b626c">preventivo</td>
+            <td><span style="background:rgba(5,150,105,.14);color:#059669;border-radius:999px;padding:2px 8px;font-size:11px">baixo</span></td>
+          </tr>
+          <tr>
+            <td>Budget por label <span class="mono">app</span>/<span class="mono">environment</span></td>
+            <td style="color:#5b626c">dev e prod dividem o projeto sem orçamento separado; sem label obrigatória não dá para alertar por app.</td>
+            <td class="mono" style="text-align:right;color:#5b626c">governança</td>
+            <td><span style="background:rgba(183,121,31,.16);color:#b7791f;border-radius:999px;padding:2px 8px;font-size:11px">médio</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"$preview":{"width":1440,"height":980}}'>
+class Component extends DCLogic {}
+</script>
+</body>
+</html>

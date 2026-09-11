@@ -1,0 +1,19 @@
+name: Dataform CI
+
+on:
+  pull_request:
+    paths:
+      - "definitions/**"
+      - "includes/**"
+      - "workflow_settings.yaml"
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: dataform compile
+        run: npx -y @dataform/cli@3.0.0 compile

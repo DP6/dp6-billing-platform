@@ -1,0 +1,18 @@
+config {
+  type: "view",
+  schema: dataform.projectConfig.vars.reporting_dataset,
+  tags: ["billing_platform"],
+  description: "Passthrough de vw_billing_daily_anomaly com renome BRL. Serve a aba Anomalias (a API filtra WHERE is_anomaly)."
+}
+
+SELECT
+  usage_date,
+  service_description,
+  net_cost_day_brl,
+  avg_28d_brl,
+  stddev_28d_brl,
+  z_score,
+  deviation_abs_brl,
+  deviation_pct,
+  is_anomaly
+FROM ${ref("vw_billing_daily_anomaly")}

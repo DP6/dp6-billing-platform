@@ -1,0 +1,23 @@
+config {
+  type: "view",
+  schema: dataform.projectConfig.vars.reporting_dataset,
+  tags: ["billing_platform"],
+  description: "Custo por app x environment por invoice_month + custo nao-alocado. Serve os graficos por app / por ambiente da aba Alocacao."
+}
+
+WITH tot AS (
+  SELECT invoice_month, SUM(net_cost_brl) AS net_cost_total_brl
+  FROM ${ref("fct_billing_cost_daily")} GROUP BY invoice_month
+)
+
+SELECT
+  f.invoice_month,
+  COALESCE(f.label_app, '(sem label)')          AS label_app,
+  COALESCE(f.label_environment, '(sem label)')  AS label_environment,
+  SUM(f.net_cost_brl)                           AS net_cost_brl,
+  SUM(f.net_cost_usd)                           AS net_cost_usd,
+  ANY_VALUE(t.net_cost_total_brl)               AS net_cost_total_brl,
+  SUM(IF(f.label_app IS NULL AND f.label_environment IS NULL, f.net_cost_brl, 0)) AS unallocated_net_cost_brl
+FROM ${ref("fct_billing_cost_daily")} f
+JOIN tot t USING (invoice_month)
+GROUP BY f.invoice_month, label_app, label_environment

@@ -1,0 +1,31 @@
+config {
+  type: "assertion",
+  tags: ["billing_platform"],
+  description: "Rede de seguranca do dedup: por invoice_month na janela, SUM(net) do fato tem que bater (tol. R$ 0,01) com SUM(cost) + SUM(creditos) direto da view de origem."
+}
+
+js { const c = require("includes/constants"); }
+
+WITH fct AS (
+  SELECT invoice_month, ROUND(SUM(net_cost_brl), 2) AS fct_net_brl
+  FROM ${ref("fct_billing_cost_daily")}
+  WHERE ${c.lookbackFilter("usage_date")}
+  GROUP BY invoice_month
+),
+src AS (
+  SELECT
+    invoice.month AS invoice_month,
+    ROUND(SUM(cost) + SUM((SELECT IFNULL(SUM(cr.amount), 0) FROM UNNEST(credits) cr)), 2) AS src_net_brl
+  FROM ${ref("billing_export_resource")}
+  WHERE ${c.lookbackFilter("DATE(usage_start_time)")}
+  GROUP BY invoice_month
+)
+
+SELECT
+  COALESCE(fct.invoice_month, src.invoice_month) AS invoice_month,
+  fct.fct_net_brl,
+  src.src_net_brl,
+  ROUND(IFNULL(fct.fct_net_brl, 0) - IFNULL(src.src_net_brl, 0), 2) AS diff_brl
+FROM fct
+FULL OUTER JOIN src USING (invoice_month)
+WHERE ABS(IFNULL(fct.fct_net_brl, 0) - IFNULL(src.src_net_brl, 0)) > 0.01

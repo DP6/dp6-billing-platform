@@ -1,0 +1,41 @@
+config {
+  type: "view",
+  schema: dataform.projectConfig.vars.reporting_dataset,
+  tags: ["billing_platform"],
+  description: "Serie mensal + analytics temporal (MoM). Serve Tendencia e a faixa de reconciliacao da VG."
+}
+
+WITH base AS (
+  SELECT
+    invoice_month,
+    invoice_month_date,
+    service_description,
+    label_environment,
+    label_app,
+    cost_type,
+    SUM(gross_cost_brl)    AS gross_cost_brl,
+    SUM(credits_total_brl) AS credits_total_brl,
+    SUM(net_cost_brl)     AS net_cost_brl,
+    SUM(net_cost_usd)    AS net_cost_usd,
+    SUM(line_count)      AS line_count
+  FROM ${ref("agg_billing_cost_monthly")}
+  GROUP BY 1,2,3,4,5,6
+)
+
+SELECT
+  *,
+  LAG(net_cost_brl) OVER (
+    PARTITION BY service_description, label_environment, label_app, cost_type
+    ORDER BY invoice_month
+  ) AS net_cost_prev_month_brl,
+  net_cost_brl - LAG(net_cost_brl) OVER (
+    PARTITION BY service_description, label_environment, label_app, cost_type
+    ORDER BY invoice_month
+  ) AS mom_abs_brl,
+  SAFE_DIVIDE(
+    net_cost_brl - LAG(net_cost_brl) OVER (
+      PARTITION BY service_description, label_environment, label_app, cost_type ORDER BY invoice_month),
+    NULLIF(LAG(net_cost_brl) OVER (
+      PARTITION BY service_description, label_environment, label_app, cost_type ORDER BY invoice_month), 0)
+  ) AS mom_pct
+FROM base
