@@ -20,11 +20,7 @@ variable "github_repo" {
 
 variable "state_bucket" {
   type    = string
-  default = "dp6-ci-polaris-tfstate-cost-model"
-}
-
-variable "billing_group_email" {
-  type    = string
-  default = "gcp-billing-platform@dp6.com.br"
-  # a SA sa-billing-platform-dataform é adicionada a este grupo (pedido externo — ver README)
+  default = "dp6-ci-polaris-tfstate-billing-platform"
+  # NAO reaproveitar o bucket do polaris-cost-model (dp6-ci-polaris-tfstate-cost-model) —
+  # states de repos diferentes nunca compartilham bucket/prefix.
 }

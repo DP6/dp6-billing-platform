@@ -3,5 +3,4 @@
 # project_number      = "209825626529"
 # region              = "us-central1"
 # github_repo         = "DP6/dp6-billing-platform"
-# state_bucket        = "dp6-ci-polaris-tfstate-cost-model"
-# billing_group_email = "gcp-billing-platform@dp6.com.br"
+# state_bucket        = "dp6-ci-polaris-tfstate-billing-platform"

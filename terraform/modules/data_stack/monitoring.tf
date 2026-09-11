@@ -3,7 +3,7 @@
 
 resource "google_monitoring_notification_channel" "email" {
   project      = var.project_id
-  display_name = "billing-polaris ${var.env} - e-mail"
+  display_name = "billing-platform ${var.env} - e-mail"
   type         = "email"
   labels = {
     email_address = var.alert_email
@@ -12,7 +12,7 @@ resource "google_monitoring_notification_channel" "email" {
 
 resource "google_monitoring_alert_policy" "dataform_failed" {
   project      = var.project_id
-  display_name = "billing-polaris ${var.env} - Dataform workflow FAILED"
+  display_name = "billing-platform ${var.env} - Dataform workflow FAILED"
   combiner     = "OR"
   enabled      = true
 
@@ -39,7 +39,7 @@ resource "google_monitoring_alert_policy" "dataform_failed" {
   notification_channels = [google_monitoring_notification_channel.email.id]
 
   documentation {
-    content   = "Falha no pipeline de custo do CI Polaris (${var.env}). Ver o workflowInvocation no console do Dataform; conferir a assertion que falhou (assert_fct_reconciliation / assert_source_freshness / assert_stg_*). Runbook: docs/ do repo dp6-billing-platform."
+    content   = "Falha no pipeline de custo da conta inteira (${var.env}). Ver o workflowInvocation no console do Dataform; conferir a assertion que falhou (assert_fct_reconciliation / assert_source_freshness / assert_stg_*). Runbook: docs/ do repo dp6-billing-platform."
     mime_type = "text/markdown"
   }
 }

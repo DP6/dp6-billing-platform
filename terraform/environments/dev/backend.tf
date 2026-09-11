@@ -1,6 +1,6 @@
 terraform {
   backend "gcs" {
-    bucket = "dp6-ci-polaris-tfstate-cost-model"
+    bucket = "dp6-ci-polaris-tfstate-billing-platform"
     prefix = "environments/dev"
   }
 }
