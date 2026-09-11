@@ -29,7 +29,7 @@ js {
 
 WITH src AS (
   SELECT s.*
-  FROM ${ref("billing_export_resource")} AS s
+  FROM ${ref(dataform.projectConfig.vars.source_table)} AS s
   ${when(incremental(), `WHERE ${c.lookbackFilter("DATE(s.usage_start_time)")}`)}
 ),
 

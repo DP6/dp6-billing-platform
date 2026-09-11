@@ -17,7 +17,7 @@ src AS (
     invoice.month AS invoice_month,
     project.id AS project_id,
     ROUND(SUM(cost) + SUM((SELECT IFNULL(SUM(cr.amount), 0) FROM UNNEST(credits) cr)), 2) AS src_net_brl
-  FROM ${ref("billing_export_resource")}
+  FROM ${ref(dataform.projectConfig.vars.source_table)}
   WHERE ${c.lookbackFilter("DATE(usage_start_time)")}
   GROUP BY invoice_month, project_id
 )
