@@ -1,6 +1,14 @@
 # ADR-006 — Alerta de falha por e-mail
 
-Data: 2026-09-09 · Status: aceito
+Data: 2026-09-09 · Status: aceito (destinatário corrigido em 2026-09-12)
+
+> **Correção 2026-09-12:** o endereço citado abaixo, `gcp-billing-platform@dp6.com.br`, **não
+> existe** — foi inventado pela renomeação mecânica do fork (o grupo real do repo-irmão é
+> `gcp-ci-polaris@dp6.com.br`). A decisão de *mecanismo* (canal de e-mail + alert policy
+> log-based) continua valendo; só o destinatário mudou para `matheus.fuzati@dp6.com.br`, em
+> caráter provisório, até a TI criar um grupo dedicado. Motivo de não reaproveitar o
+> `gcp-ci-polaris@`: este painel cobre o custo de todos os projetos da conta, e aquele grupo
+> foi criado para dar acesso a um projeto só.
 
 ## Contexto
 

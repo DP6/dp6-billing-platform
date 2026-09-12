@@ -34,12 +34,15 @@ variable "api_image" {
   default = "us-docker.pkg.dev/cloudrun/container/hello"
 }
 
+# PROVISORIO — mesma situacao do dev (ver comentario em environments/dev/variables.tf): o
+# grupo gcp-billing-platform@dp6.com.br nao existe. Prod ainda nao foi aplicado; quando for,
+# revisar isto antes (painel de custo da conta inteira merece grupo proprio, nao usuario solto).
 variable "iap_allowed_members" {
   type    = list(string)
-  default = ["group:gcp-billing-platform@dp6.com.br"]
+  default = ["user:matheus.fuzati@dp6.com.br"]
 }
 
 variable "alert_email" {
   type    = string
-  default = "gcp-billing-platform@dp6.com.br"
+  default = "matheus.fuzati@dp6.com.br"
 }

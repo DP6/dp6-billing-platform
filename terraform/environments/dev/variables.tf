@@ -36,12 +36,18 @@ variable "api_image" {
   default = "us-docker.pkg.dev/cloudrun/container/hello"
 }
 
+# PROVISORIO: o grupo gcp-billing-platform@dp6.com.br nunca existiu — foi inventado pela
+# renomeacao mecanica do fork (o real, do repo-irmao, e gcp-ci-polaris@dp6.com.br). Resultado:
+# a politica do IAP ficou vazia e ninguem acessava o painel.
+# Enquanto a TI nao cria um grupo dedicado, fica so o usuario. NAO reaproveitar o
+# gcp-ci-polaris@: aquele grupo da acesso ao projeto dp6-ci-polaris, e este painel mostra o
+# custo de TODOS os projetos da conta de faturamento.
 variable "iap_allowed_members" {
   type    = list(string)
-  default = ["group:gcp-billing-platform@dp6.com.br"]
+  default = ["user:matheus.fuzati@dp6.com.br"]
 }
 
 variable "alert_email" {
   type    = string
-  default = "gcp-billing-platform@dp6.com.br"
+  default = "matheus.fuzati@dp6.com.br" # idem: trocar pelo grupo dedicado quando existir
 }
