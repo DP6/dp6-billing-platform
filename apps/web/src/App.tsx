@@ -70,8 +70,8 @@ function TopBar() {
         <path d="M10 18 L10 7 L15 5 L15 18 Z" fill="#ffb302" />
         <path d="M18 18 L18 2 L23 0 L23 18 Z" fill="#ffb302" />
       </svg>
-      <span style={{ fontWeight: 500 }}>CI Polaris</span>
-      <span style={{ color: "#a7abb0", fontSize: 13 }}>· controle de custo</span>
+      <span style={{ fontWeight: 500 }}>Billing Platform</span>
+      <span style={{ color: "#a7abb0", fontSize: 13 }}>· custo da conta inteira</span>
       <span style={{ flex: 1 }} />
       {meta.data?.data_updated_at && (
         <span
@@ -221,10 +221,14 @@ function FilterBar() {
         </select>
       </Field>
 
-      <Field label="Moeda">
-        <select value={f.currency} onChange={(e) => pick("currency", e.target.value)} style={selectStyle}>
-          <option value="BRL">BRL</option>
-          <option value="USD">USD</option>
+      <Field label="Projeto">
+        <select value={f.project ?? ""} onChange={(e) => pick("project", e.target.value)} style={selectStyle}>
+          <option value="">Todos</option>
+          {(dims.data?.projects ?? []).map((p) => (
+            <option key={p.project_id} value={p.project_id}>
+              {p.project_name}
+            </option>
+          ))}
         </select>
       </Field>
 
@@ -240,7 +244,7 @@ function FilterBar() {
               service: "",
               environment: "",
               app: "",
-              currency: "BRL",
+              project: "",
             });
           }}
           style={{
@@ -305,7 +309,7 @@ export default function App() {
           font: '400 11.5px/1.5 "Ubuntu Mono", monospace',
         }}
       >
-        dp6-billing-platform / apps/web · painel FinOps do CI Polaris · dados via apps/api (rpt_* no BigQuery,
+        dp6-billing-platform / apps/web · painel FinOps da conta de faturamento · dados via apps/api (rpt_* no BigQuery,
         ou modo mock)
       </footer>
     </>

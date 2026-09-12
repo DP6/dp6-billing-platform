@@ -26,15 +26,16 @@ def _pct_of_total(rows: list[dict], total: float) -> list[dict]:
 
 
 def _scope(
-    service: str | None, environment: str | None, app: str | None
+    service: str | None, environment: str | None, app: str | None, project: str | None = None
 ) -> tuple[str, dict]:
-    """Clausula WHERE de recorte (serviço/ambiente/app) para as views rpt_*.
-    Devolve ("" ou " AND ...", params). currency nao entra aqui (e so display)."""
+    """Clausula WHERE de recorte (serviço/ambiente/app/projeto) para as views rpt_*.
+    Devolve ("" ou " AND ...", params)."""
     clauses, params = [], {}
     for col, val in (
         ("service_description", service),
         ("label_environment", environment),
         ("label_app", app),
+        ("project_id", project),
     ):
         if val:
             clauses.append(f"{col} = @{col}")
@@ -42,8 +43,8 @@ def _scope(
     return (" AND " + " AND ".join(clauses) if clauses else "", params)
 
 
-def _has_scope(service: str | None, environment: str | None, app: str | None) -> bool:
-    return bool(service or environment or app)
+def _has_scope(service: str | None, environment: str | None, app: str | None, project: str | None = None) -> bool:
+    return bool(service or environment or app or project)
 
 
 # ---------------------------------------------------------------- meta / dimensions / scorecard
@@ -79,7 +80,7 @@ def meta() -> m.MetaDTO:
 
 @router.get("/dimensions", response_model=m.DimensionsDTO)
 def dimensions() -> m.DimensionsDTO:
-    """Valores das listas de filtro (Serviço/Ambiente/App) + frescor + taxa de cambio."""
+    """Valores das listas de filtro (Serviço/Ambiente/App/Projeto) + frescor."""
     if mock_active():
         return m.DimensionsDTO(**fx.DIMENSIONS)
     services = [r["v"] for r in query(
@@ -94,19 +95,18 @@ def dimensions() -> m.DimensionsDTO:
         f"SELECT DISTINCT label_app v FROM `{RPT}.rpt_cost_daily` "
         f"WHERE label_app IS NOT NULL AND label_app != '' ORDER BY 1"
     )]
-    fr = _freshness()
-    rate_rows = query(
-        f"SELECT SAFE_DIVIDE(SUM(gross_cost_brl), NULLIF(SUM(gross_cost_usd), 0)) r "
-        f"FROM `{RPT}.rpt_cost_daily` "
-        f"WHERE usage_date >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 45 DAY)"
+    project_rows = query(
+        f"SELECT project_id, ANY_VALUE(project_name) project_name FROM `{RPT}.rpt_cost_daily` "
+        f"WHERE project_id IS NOT NULL GROUP BY project_id ORDER BY project_name"
     )
+    fr = _freshness()
     return m.DimensionsDTO(
         services=services,
         environments=environments,
         apps=apps,
+        projects=[m.ProjectDTO(**r) for r in project_rows],
         invoice_months=fr["invoice_months"],
         data_updated_at=fr["data_updated_at"],
-        currency_rate=float((rate_rows[0]["r"] if rate_rows else 0.0) or 0.0),
         export_ok=True,
         source_rows=fr["source_rows"],
     )
@@ -114,10 +114,10 @@ def dimensions() -> m.DimensionsDTO:
 
 @router.get("/scorecard", response_model=m.ScorecardDTO)
 def scorecard(
-    currency: str = "BRL",
     service: str | None = None,
     environment: str | None = None,
     app: str | None = None,
+    project: str | None = None,
     from_: DateStr | None = Query(default=None, alias="from"),
     to: DateStr | None = None,
 ) -> m.ScorecardDTO:
@@ -128,7 +128,7 @@ def scorecard(
     if mock_active():
         return m.ScorecardDTO(**fx.SCORECARD)
 
-    where, params = _scope(service, environment, app)
+    where, params = _scope(service, environment, app, project)
 
     # sempre precisamos do MTD para run_rate/budget/dias
     mtd = query(f"""
@@ -168,7 +168,7 @@ def scorecard(
         credits = float(win["credits"] or 0.0)
         net_usd = float(win["net_usd"] or 0.0)
         net_prev = float(prev["net"] or 0.0)
-    elif not _has_scope(service, environment, app):
+    elif not _has_scope(service, environment, app, project):
         r = query(f"SELECT * FROM `{RPT}.rpt_cost_scorecard`")[0]
         return m.ScorecardDTO(**r)
     else:
@@ -207,14 +207,17 @@ def scorecard(
 def cost_daily(
     from_: DateStr = Query(alias="from"), to: DateStr = Query(...),
     service: str | None = None, environment: str | None = None, app: str | None = None,
-    currency: str = "BRL",
+    project: str | None = None,
 ) -> list[m.DailyPointDTO]:
     if mock_active():
         pts = [p for p in fx.daily_points() if from_ <= p["usage_date"] <= to]
         return [m.DailyPointDTO(**p) for p in pts]
     where = ["usage_date BETWEEN @from AND @to"]
     params: dict = {"from": from_, "to": to}
-    for col, val in (("service_description", service), ("label_environment", environment), ("label_app", app)):
+    for col, val in (
+        ("service_description", service), ("label_environment", environment),
+        ("label_app", app), ("project_id", project),
+    ):
         if val:
             where.append(f"{col} = @{col}")
             params[col] = val
@@ -234,17 +237,20 @@ def cost_daily(
 @router.get("/cost/series", response_model=list[m.CostSeriesPointDTO])
 def cost_series(
     grain: str = "day",  # day | month
-    group_by: str = "none",  # none | service | environment | app
+    group_by: str = "none",  # none | service | environment | app | project
     from_: DateStr | None = Query(default=None, alias="from"),
     to: DateStr | None = None,
     service: str | None = None,
     environment: str | None = None,
     app: str | None = None,
-    currency: str = "BRL",
+    project: str | None = None,
 ) -> list[m.CostSeriesPointDTO]:
     """Serie temporal em formato longo: barras por periodo, opcionalmente empilhadas.
     grain=day -> rpt_cost_daily; grain=month -> rpt_cost_monthly."""
-    col = {"service": "service_description", "environment": "label_environment", "app": "label_app"}.get(group_by)
+    col = {
+        "service": "service_description", "environment": "label_environment",
+        "app": "label_app", "project": "project_name",
+    }.get(group_by)
     if mock_active():
         pts = [p for p in fx.daily_points() if (not from_ or p["usage_date"] >= from_) and (not to or p["usage_date"] <= to)]
         if grain == "month":
@@ -257,7 +263,10 @@ def cost_series(
         if not col:
             return [m.CostSeriesPointDTO(period=b["period"], key="total", net_cost_brl=b["v"]) for b in base]
         # mock: reparte cada periodo entre as chaves do fx.DIMENSIONS de forma estavel
-        keys = fx.DIMENSIONS[{"service_description": "services", "label_environment": "environments", "label_app": "apps"}[col]]
+        if col == "project_name":
+            keys = [p["project_name"] for p in fx.DIMENSIONS["projects"]]
+        else:
+            keys = fx.DIMENSIONS[{"service_description": "services", "label_environment": "environments", "label_app": "apps"}[col]]
         w = [0.55, 0.30, 0.15] + [0.0] * len(keys)
         out = []
         for b in base:
@@ -265,7 +274,7 @@ def cost_series(
                 out.append(m.CostSeriesPointDTO(period=b["period"], key=k, net_cost_brl=round(b["v"] * w[i], 4)))
         return out
 
-    where, params = _scope(service, environment, app)
+    where, params = _scope(service, environment, app, project)
     if grain == "month":
         period_sql = "invoice_month"
         src = f"`{RPT}.rpt_cost_monthly`"
@@ -290,19 +299,41 @@ def cost_series(
 @router.get("/cost/by-service", response_model=list[m.ServiceCostDTO])
 def cost_by_service(
     from_: DateStr = Query(alias="from"), to: DateStr = Query(...),
-    environment: str | None = None, app: str | None = None, currency: str = "BRL",
+    environment: str | None = None, app: str | None = None, project: str | None = None,
 ) -> list[m.ServiceCostDTO]:
     if mock_active():
         total = sum(v for _, v in fx.SERVICES)
         return [m.ServiceCostDTO(service_description=s, net_cost_brl=v, pct_of_total=v / total)
                 for s, v in fx.SERVICES]
+    where, params = _scope(None, environment, app, project)
     rows = query(f"""
         SELECT service_description, SUM(net_cost_brl) net_cost_brl
-        FROM `{RPT}.rpt_cost_daily` WHERE usage_date BETWEEN @from AND @to
+        FROM `{RPT}.rpt_cost_daily` WHERE usage_date BETWEEN @from AND @to {where}
         GROUP BY service_description ORDER BY net_cost_brl DESC
-    """, {"from": from_, "to": to})
+    """, {**params, "from": from_, "to": to})
     total = sum(r["net_cost_brl"] for r in rows) or 1.0
     return [m.ServiceCostDTO(service_description=r["service_description"],
+                             net_cost_brl=r["net_cost_brl"], pct_of_total=r["net_cost_brl"] / total)
+            for r in rows]
+
+
+@router.get("/cost/by-project", response_model=list[m.ProjectCostDTO])
+def cost_by_project(
+    from_: DateStr = Query(alias="from"), to: DateStr = Query(...),
+    service: str | None = None, environment: str | None = None, app: str | None = None,
+) -> list[m.ProjectCostDTO]:
+    if mock_active():
+        total = sum(v for _, v in fx.PROJECTS)
+        return [m.ProjectCostDTO(project_id=pid, project_name=pid, net_cost_brl=v, pct_of_total=v / total)
+                for pid, v in fx.PROJECTS]
+    where, params = _scope(service, environment, app)
+    rows = query(f"""
+        SELECT project_id, ANY_VALUE(project_name) project_name, SUM(net_cost_brl) net_cost_brl
+        FROM `{RPT}.rpt_cost_daily` WHERE usage_date BETWEEN @from AND @to {where}
+        GROUP BY project_id ORDER BY net_cost_brl DESC
+    """, {**params, "from": from_, "to": to})
+    total = sum(r["net_cost_brl"] for r in rows) or 1.0
+    return [m.ProjectCostDTO(project_id=r["project_id"], project_name=r["project_name"],
                              net_cost_brl=r["net_cost_brl"], pct_of_total=r["net_cost_brl"] / total)
             for r in rows]
 
@@ -310,7 +341,7 @@ def cost_by_service(
 @router.get("/cost/monthly", response_model=list[m.MonthlyServicePointDTO])
 def cost_monthly(
     from_: DateStr | None = Query(default=None, alias="from"), to: DateStr | None = None,
-    environment: str | None = None, app: str | None = None, currency: str = "BRL",
+    environment: str | None = None, app: str | None = None, project: str | None = None,
 ) -> list[m.MonthlyServicePointDTO]:
     if mock_active():
         out = []
@@ -318,25 +349,29 @@ def cost_monthly(
             out += [m.MonthlyServicePointDTO(invoice_month=ym, service_description=s, net_cost_brl=v)
                     for s, v in (("Cloud Run", cr), ("BigQuery", bq), ("Outros", ot)) if v]
         return out
+    where, params = _scope(None, environment, app, project)
+    if from_ and to:
+        where += " AND invoice_month_date BETWEEN DATE_TRUNC(@from, MONTH) AND @to"
+        params = {**params, "from": from_, "to": to}
     rows = query(f"""
         SELECT invoice_month, service_description, SUM(net_cost_brl) net_cost_brl
-        FROM `{RPT}.rpt_cost_monthly` GROUP BY 1,2 ORDER BY 1,3 DESC
-    """)
+        FROM `{RPT}.rpt_cost_monthly` WHERE TRUE {where} GROUP BY 1,2 ORDER BY 1,3 DESC
+    """, params)
     return [m.MonthlyServicePointDTO(**r) for r in rows]
 
 
 @router.get("/reconciliation", response_model=list[m.ReconRowDTO])
 def reconciliation(
-    currency: str = "BRL",
     service: str | None = None,
     environment: str | None = None,
     app: str | None = None,
+    project: str | None = None,
 ) -> list[m.ReconRowDTO]:
     if mock_active():
         return [m.ReconRowDTO(invoice_month=ym, gross_cost_brl=g, credits_total_brl=cr,
                               net_cost_brl=n, matches_invoice=True)
                 for ym, _, _, _, g, cr, n in fx.MONTHS]
-    where, params = _scope(service, environment, app)
+    where, params = _scope(service, environment, app, project)
     rows = query(f"""
         SELECT invoice_month, SUM(gross_cost_brl) gross_cost_brl,
                SUM(credits_total_brl) credits_total_brl, SUM(net_cost_brl) net_cost_brl
@@ -349,12 +384,12 @@ def reconciliation(
 
 @router.get("/budget", response_model=m.BudgetDTO)
 def budget(
-    currency: str = "BRL",
     service: str | None = None,
     environment: str | None = None,
     app: str | None = None,
+    project: str | None = None,
 ) -> m.BudgetDTO:
-    sc = scorecard(currency, service, environment, app)
+    sc = scorecard(service, environment, app, project)
     thresholds = [m.ThresholdDTO(pct=p, value_brl=S.monthly_budget_brl * p) for p in S.budget_thresholds]
     breach: str | None = None
     if mock_active():
@@ -378,7 +413,7 @@ def budget(
 
 
 @router.get("/budget/burndown", response_model=list[m.BurndownPointDTO])
-def burndown(month: str | None = None, currency: str = "BRL") -> list[m.BurndownPointDTO]:
+def burndown(month: str | None = None) -> list[m.BurndownPointDTO]:
     if mock_active():
         cum, out = 0.0, []
         for p in fx.daily_points():
@@ -399,14 +434,14 @@ def burndown(month: str | None = None, currency: str = "BRL") -> list[m.Burndown
 @router.get("/forecast", response_model=list[m.ForecastMonthDTO])
 def forecast(
     horizon: int = 3,
-    currency: str = "BRL",
     service: str | None = None,
     environment: str | None = None,
     app: str | None = None,
+    project: str | None = None,
 ) -> list[m.ForecastMonthDTO]:
-    # rpt_forecast_monthly nao tem grao de serviço/label — a previsao fica projeto-inteiro
+    # rpt_forecast_monthly nao tem grao de serviço/label/projeto — a previsao fica conta-inteira
     # por ora (os params sao aceitos para uniformidade da FilterBar). Ver specs/004.
-    _ = (service, environment, app)
+    _ = (service, environment, app, project)
     if mock_active():
         return [
             m.ForecastMonthDTO(invoice_month="202608", is_actual=True, value_brl=23.65,
@@ -428,39 +463,67 @@ def forecast(
 # ---------------------------------------------------------------- allocation
 
 @router.get("/allocation/coverage", response_model=list[m.LabelCoverageDTO])
-def alloc_coverage(months: int = 3) -> list[m.LabelCoverageDTO]:
+def alloc_coverage(months: int = 3, project: str | None = None) -> list[m.LabelCoverageDTO]:
+    """`rpt_label_coverage` tem grao invoice_month x project_id — sem `project`, agrega
+    (soma os numeradores/denominador) de volta pra conta inteira em vez de devolver
+    uma linha arbitraria por projeto."""
     if mock_active():
         return [m.LabelCoverageDTO(**c) for c in fx.COVERAGE]
-    rows = query(f"SELECT invoice_month, pct_app, pct_environment, pct_managed_by, net_cost_total_brl "
-                 f"FROM `{RPT}.rpt_label_coverage` ORDER BY invoice_month DESC LIMIT @months",
-                 {"months": months})
+    where, params = ("", {})
+    if project:
+        where, params = " AND project_id = @project", {"project": project}
+    rows = query(f"""
+        SELECT invoice_month,
+               SAFE_DIVIDE(SUM(net_cost_with_app_brl), SUM(net_cost_total_brl)) pct_app,
+               SAFE_DIVIDE(SUM(net_cost_with_environment_brl), SUM(net_cost_total_brl)) pct_environment,
+               SAFE_DIVIDE(SUM(net_cost_with_managed_by_brl), SUM(net_cost_total_brl)) pct_managed_by,
+               SUM(net_cost_total_brl) net_cost_total_brl
+        FROM `{RPT}.rpt_label_coverage` WHERE TRUE {where}
+        GROUP BY invoice_month ORDER BY invoice_month DESC LIMIT @months
+    """, {**params, "months": months})
     return [m.LabelCoverageDTO(**r) for r in rows]
 
 
 @router.get("/allocation/coverage/weekly", response_model=list[m.CoverageWeekDTO])
 def alloc_coverage_weekly(
     from_: DateStr | None = Query(default=None, alias="from"), to: DateStr | None = None,
+    project: str | None = None,
 ) -> list[m.CoverageWeekDTO]:
+    """`rpt_label_coverage_weekly` tem grao week_start x project_id e so expoe as fracoes
+    (nao os numeradores) — reconstroi o numerador como pct * net_cost_week_brl (exato, ja
+    que foi assim que a view calculou o pct) pra poder agregar entre projetos sem `project`."""
     if mock_active():
         return [m.CoverageWeekDTO(**w) for w in fx.COVERAGE_WEEKLY]
-    rows = query(f"SELECT CAST(week_start AS STRING) week_start, pct_app, pct_environment, pct_managed_by "
-                 f"FROM `{RPT}.rpt_label_coverage_weekly` ORDER BY week_start")
+    where, params = ("", {})
+    if project:
+        where, params = " AND project_id = @project", {"project": project}
+    rows = query(f"""
+        SELECT CAST(week_start AS STRING) week_start,
+               SAFE_DIVIDE(SUM(pct_app * net_cost_week_brl), SUM(net_cost_week_brl)) pct_app,
+               SAFE_DIVIDE(SUM(pct_environment * net_cost_week_brl), SUM(net_cost_week_brl)) pct_environment,
+               SAFE_DIVIDE(SUM(pct_managed_by * net_cost_week_brl), SUM(net_cost_week_brl)) pct_managed_by
+        FROM `{RPT}.rpt_label_coverage_weekly` WHERE TRUE {where}
+        GROUP BY week_start ORDER BY week_start
+    """, params)
     return [m.CoverageWeekDTO(**r) for r in rows]
 
 
 @router.get("/allocation/by-app", response_model=m.AppAllocationDTO)
 def alloc_by_app(
     from_: DateStr | None = Query(default=None, alias="from"), to: DateStr | None = None,
-    currency: str = "BRL",
+    project: str | None = None,
 ) -> m.AppAllocationDTO:
     if mock_active():
         return m.AppAllocationDTO(**fx.ALLOC_BY_APP)
+    where, params = ("", {})
+    if project:
+        where, params = " AND project_id = @project", {"project": project}
     rows = query(f"""
         SELECT label_app, SUM(net_cost_brl) net_cost_brl,
                ANY_VALUE(unallocated_net_cost_brl) un, ANY_VALUE(net_cost_total_brl) tot
-        FROM `{RPT}.rpt_showback_monthly` WHERE label_app != '(sem label)'
+        FROM `{RPT}.rpt_showback_monthly` WHERE label_app != '(sem label)' {where}
         GROUP BY label_app ORDER BY net_cost_brl DESC
-    """)
+    """, params)
     un = rows[0]["un"] if rows else 0.0
     tot = rows[0]["tot"] if rows else 1.0
     return m.AppAllocationDTO(
@@ -472,19 +535,22 @@ def alloc_by_app(
 @router.get("/allocation/by-env", response_model=m.EnvAllocationDTO)
 def alloc_by_env(
     from_: DateStr | None = Query(default=None, alias="from"), to: DateStr | None = None,
-    currency: str = "BRL",
+    project: str | None = None,
 ) -> m.EnvAllocationDTO:
     if mock_active():
         rows = [m.EnvCostDTO(**e) for e in fx.ALLOC_BY_ENV]
         un = float(fx.ALLOC_BY_APP["unallocated_net_cost_brl"])
         tot = sum(r.net_cost_brl for r in rows) + un
         return m.EnvAllocationDTO(rows=rows, unallocated_net_cost_brl=un, unallocated_pct=un / tot if tot else 0.0)
+    where, params = ("", {})
+    if project:
+        where, params = " AND project_id = @project", {"project": project}
     rows_raw = query(f"""
         SELECT label_environment, SUM(net_cost_brl) net_cost_brl,
                ANY_VALUE(unallocated_net_cost_brl) un, ANY_VALUE(net_cost_total_brl) tot
-        FROM `{RPT}.rpt_showback_monthly` WHERE label_environment != '(sem label)'
+        FROM `{RPT}.rpt_showback_monthly` WHERE label_environment != '(sem label)' {where}
         GROUP BY label_environment ORDER BY net_cost_brl DESC
-    """)
+    """, params)
     un = rows_raw[0]["un"] if rows_raw else 0.0
     tot = rows_raw[0]["tot"] if rows_raw else 1.0
     return m.EnvAllocationDTO(
@@ -498,7 +564,13 @@ def alloc_by_env(
 def chargeback_readiness() -> m.ChargebackReadinessDTO:
     if mock_active():
         return m.ChargebackReadinessDTO(**fx.CHARGEBACK)
-    cov = query(f"SELECT pct_app FROM `{RPT}.rpt_label_coverage` ORDER BY invoice_month DESC LIMIT 1")
+    # rpt_label_coverage tem grao invoice_month x project_id — agrega de volta pra conta
+    # inteira antes de pegar o mes mais recente (senao "LIMIT 1" pegaria so um projeto).
+    cov = query(f"""
+        SELECT SAFE_DIVIDE(SUM(net_cost_with_app_brl), SUM(net_cost_total_brl)) pct_app
+        FROM `{RPT}.rpt_label_coverage`
+        WHERE invoice_month = (SELECT MAX(invoice_month) FROM `{RPT}.rpt_label_coverage`)
+    """)
     pct = cov[0]["pct_app"] if cov else 0.0
     return m.ChargebackReadinessDTO(
         coverage_pct=pct, ready=pct >= 0.95,
@@ -512,23 +584,21 @@ def chargeback_readiness() -> m.ChargebackReadinessDTO:
 def cost_by_sku(
     from_: DateStr = Query(alias="from"), to: DateStr = Query(...),
     service: str | None = None, environment: str | None = None, app: str | None = None,
-    currency: str = "BRL",
+    project: str | None = None,
 ) -> list[m.SkuCostDTO]:
     if mock_active():
         return [m.SkuCostDTO(service_description=s, sku_description=k, pricing_unit=u,
                              net_cost_brl=c, usage_qty=q, unit_cost_brl=uc)
                 for s, k, u, c, q, uc in fx.SKU_COST
                 if not service or s == service]
+    scope_where, params = _scope(service, environment, app, project)
     where = ["usage_date BETWEEN @from AND @to"]
-    params: dict = {"from": from_, "to": to}
-    if service:
-        where.append("service_description = @service")
-        params["service"] = service
+    params = {**params, "from": from_, "to": to}
     rows = query(f"""
         SELECT service_description, sku_description, ANY_VALUE(pricing_unit) pricing_unit,
                SUM(net_cost_brl) net_cost_brl, SUM(usage_amount_pricing_units) usage_qty,
                SAFE_DIVIDE(SUM(net_cost_brl), NULLIF(SUM(usage_amount_pricing_units),0)) unit_cost_brl
-        FROM `{RPT}.rpt_cost_daily` WHERE {" AND ".join(where)}
+        FROM `{RPT}.rpt_cost_daily` WHERE {" AND ".join(where)} {scope_where}
         GROUP BY 1,2 ORDER BY net_cost_brl DESC
     """, params)
     return [m.SkuCostDTO(**r, ) for r in rows]
@@ -548,7 +618,7 @@ def sku_new() -> list[m.NewSkuDTO]:
 # ---------------------------------------------------------------- optimization
 
 @router.get("/optimization/commitment-coverage", response_model=m.CommitmentCoverageDTO)
-def commitment_coverage(currency: str = "BRL") -> m.CommitmentCoverageDTO:
+def commitment_coverage() -> m.CommitmentCoverageDTO:
     if mock_active():
         return m.CommitmentCoverageDTO(**fx.COMMITMENT)
     r = query(f"SELECT * FROM `{RPT}.rpt_commitment_coverage`")[0]
@@ -570,7 +640,7 @@ def recommendations() -> m.RecommendationsDTO:
 # ---------------------------------------------------------------- unit economics
 
 @router.get("/unit-economics", response_model=m.UnitEconomicsDTO)
-def unit_economics(currency: str = "BRL") -> m.UnitEconomicsDTO:
+def unit_economics() -> m.UnitEconomicsDTO:
     if mock_active():
         return m.UnitEconomicsDTO(**fx.UNIT_ECON)
     r = query(f"SELECT * FROM `{RPT}.rpt_unit_economics`")[0]
@@ -581,7 +651,6 @@ def unit_economics(currency: str = "BRL") -> m.UnitEconomicsDTO:
 @router.get("/unit-economics/series", response_model=list[m.UnitSeriesPointDTO])
 def unit_economics_series(
     metric: str = "cost_per_1k_req", from_: DateStr = Query(alias="from"), to: DateStr = Query(...),
-    currency: str = "BRL",
 ) -> list[m.UnitSeriesPointDTO]:
     if mock_active():
         return [m.UnitSeriesPointDTO(usage_date=p["usage_date"], value_brl=0.0006)
@@ -597,7 +666,7 @@ def unit_economics_series(
 
 
 @router.get("/efficiency/waterfall", response_model=list[m.WaterfallStepDTO])
-def efficiency_waterfall(period: str | None = None, currency: str = "BRL") -> list[m.WaterfallStepDTO]:
+def efficiency_waterfall(period: str | None = None) -> list[m.WaterfallStepDTO]:
     if mock_active():
         return [m.WaterfallStepDTO(**s) for s in fx.WATERFALL]
     rows = query(f"SELECT step label, kind, value_brl FROM `{RPT}.rpt_savings_waterfall` "
@@ -610,15 +679,18 @@ def efficiency_waterfall(period: str | None = None, currency: str = "BRL") -> li
 @router.get("/anomalies", response_model=list[m.AnomalyRowDTO])
 def anomalies(
     from_: DateStr | None = Query(default=None, alias="from"), to: DateStr | None = None,
-    currency: str = "BRL",
+    project: str | None = None,
 ) -> list[m.AnomalyRowDTO]:
     if mock_active():
         return [m.AnomalyRowDTO(**a) for a in fx.ANOMALIES]
+    where, params = ("", {})
+    if project:
+        where, params = " AND project_id = @project", {"project": project}
     rows = query(f"""
-        SELECT CAST(usage_date AS STRING) usage_date, service_description,
+        SELECT CAST(usage_date AS STRING) usage_date, project_id, project_name, service_description,
                net_cost_day_brl AS net_cost_brl, avg_28d_brl, z_score,
                deviation_abs_brl, deviation_pct
-        FROM `{RPT}.rpt_anomaly_daily` WHERE is_anomaly
+        FROM `{RPT}.rpt_anomaly_daily` WHERE is_anomaly {where}
         ORDER BY usage_date DESC
-    """)
+    """, params)
     return [m.AnomalyRowDTO(**r) for r in rows]

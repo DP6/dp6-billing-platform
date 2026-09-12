@@ -22,6 +22,12 @@ SERVICES = [
     ("Artifact Registry", 0.77), ("Cloud Scheduler", 0.50), ("Cloud Storage", 0.01),
 ]
 
+# (project_id, net_cost_brl) — mock de 3 projetos da conta pra exercitar filtro/agrupamento
+# por projeto sem precisar de dado real do BigQuery ainda (TI nao liberou o acesso).
+PROJECTS = [
+    ("dp6-ci-polaris", 21.81), ("dp6-billing-voucher", 3.10), ("dp6-atlas", 1.50),
+]
+
 MONTHS = [  # invoice_month, cloud_run, bigquery, outros, gross, credits, net
     ("202607", 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
     ("202608", 20.28, 1.44, 1.93, 23.65, 0.0, 23.65),
@@ -39,9 +45,9 @@ DIMENSIONS = {
     "services": [s for s, _ in SERVICES],
     "environments": ["prod", "dev"],
     "apps": ["atlas", "polaris-cost-control", "observability-hub"],
+    "projects": [{"project_id": pid, "project_name": pid} for pid, _ in PROJECTS],
     "invoice_months": ["202607", "202608", "202609"],
     "data_updated_at": META["data_updated_at"],
-    "currency_rate": RATE,
     "export_ok": True,
     "source_rows": META["source_rows"],
 }
@@ -77,9 +83,11 @@ def daily_points() -> list[dict]:
 
 
 ANOMALIES = [
-    {"usage_date": "2026-08-25", "service_description": "Cloud Run", "net_cost_brl": 5.68,
+    {"usage_date": "2026-08-25", "project_id": "dp6-ci-polaris", "project_name": "dp6-ci-polaris",
+     "service_description": "Cloud Run", "net_cost_brl": 5.68,
      "avg_28d_brl": 0.46, "z_score": 4.1, "deviation_abs_brl": 5.22, "deviation_pct": 11.35},
-    {"usage_date": "2026-08-21", "service_description": "Cloud Run", "net_cost_brl": 5.15,
+    {"usage_date": "2026-08-21", "project_id": "dp6-ci-polaris", "project_name": "dp6-ci-polaris",
+     "service_description": "Cloud Run", "net_cost_brl": 5.15,
      "avg_28d_brl": 0.42, "z_score": 3.7, "deviation_abs_brl": 4.73, "deviation_pct": 11.26},
 ]
 
