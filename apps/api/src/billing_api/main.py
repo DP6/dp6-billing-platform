@@ -29,6 +29,15 @@ async def _unhandled(_: Request, exc: Exception) -> JSONResponse:
     return JSONResponse(status_code=500, content={"error": {"code": "internal", "message": str(exc)}})
 
 
+@app.exception_handler(HTTPException)
+async def _http_exc(_: Request, exc: HTTPException) -> JSONResponse:
+    # mesmo contrato {"error": {...}} do handler generico acima, pros dois serem
+    # indistinguiveis pro cliente (apps/web/src/lib/api.ts le body.error.message).
+    detail = exc.detail
+    body = detail if isinstance(detail, dict) and "message" in detail else {"code": "http_error", "message": str(detail)}
+    return JSONResponse(status_code=exc.status_code, content={"error": body})
+
+
 @app.get("/healthz")
 def healthz() -> dict:
     return {"ok": True, "mode": "mock" if mock_active() else "bigquery"}
