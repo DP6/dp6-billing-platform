@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: dataform.projectConfig.vars.source_project,
+  schema: dataform.projectConfig.vars.source_dataset,
+  name: dataform.projectConfig.vars.source_table,
+  description: "Billing export detalhado (resource-level) da conta inteira (008012-F93445-DFD798, todos os projetos) — SEM filtro de project.id. Acesso direto na tabela bruta (nao e authorized view, ver ADR de acesso). SELECT * sem dedup/agregacao. Tabela real: dp6-billing-voucher.billing_export.gcp_billing_export_resource_v1_008012_F93445_DFD798."
+}

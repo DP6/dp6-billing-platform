@@ -1,0 +1,50 @@
+config {
+  type: "view",
+  schema: dataform.projectConfig.vars.reporting_dataset,
+  tags: ["billing_platform"],
+  description: "Dimensao service/sku (conta inteira, agregado entre projetos) + custo unitario lifetime + recencia + delta mes a mes (top movers). O custo unitario da janela filtrada a API calcula de rpt_cost_daily (que tem project_id). Sem project_id aqui de proposito — dim_service_sku e um catalogo global de sku; quebrar por projeto duplicaria o catalogo (mesmo sku usado em N projetos) e mudaria o grao desta view."
+}
+
+-- agg_billing_cost_monthly nao tem grao de sku (so service x label x cost_type).
+-- O movimento mes a mes por sku sai do fato diario.
+WITH last_two AS (
+  SELECT
+    service_description, sku_description, pricing_unit, invoice_month,
+    SUM(net_cost_brl) AS net_cost_brl
+  FROM ${ref("fct_billing_cost_daily")}
+  GROUP BY 1,2,3,4
+),
+mov AS (
+  SELECT
+    service_description, sku_description, pricing_unit,
+    net_cost_brl,
+    LAG(net_cost_brl) OVER (PARTITION BY service_description, sku_description, pricing_unit ORDER BY invoice_month) AS net_cost_prev_month_brl,
+    ROW_NUMBER() OVER (PARTITION BY service_description, sku_description, pricing_unit ORDER BY invoice_month DESC) AS rn
+  FROM last_two
+)
+
+SELECT
+  d.service_id,
+  d.service_description,
+  d.sku_id,
+  d.sku_description,
+  d.pricing_unit,
+  d.first_seen_date,
+  d.last_seen_date,
+  (d.first_seen_date >= DATE_SUB(CURRENT_DATE('${dataform.projectConfig.vars.timezone}'), INTERVAL 30 DAY)) AS is_new_30d,
+  d.net_cost_brl_lifetime,
+  SAFE_DIVIDE(SUM(f.net_cost_brl), NULLIF(SUM(f.usage_amount_pricing_units), 0)) AS unit_cost_brl_lifetime,
+  ANY_VALUE(m.net_cost_brl)            AS net_cost_current_month_brl,
+  ANY_VALUE(m.net_cost_prev_month_brl) AS net_cost_prev_month_brl,
+  ANY_VALUE(m.net_cost_brl) - ANY_VALUE(m.net_cost_prev_month_brl) AS delta_brl
+FROM ${ref("dim_service_sku")} d
+LEFT JOIN ${ref("fct_billing_cost_daily")} f
+  ON f.service_description = d.service_description
+ AND f.sku_description = d.sku_description
+ AND f.pricing_unit = d.pricing_unit
+LEFT JOIN mov m
+  ON m.service_description = d.service_description
+ AND m.sku_description = d.sku_description
+ AND m.pricing_unit = d.pricing_unit
+ AND m.rn = 1
+GROUP BY 1,2,3,4,5,6,7,8,9

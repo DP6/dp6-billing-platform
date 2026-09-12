@@ -1,0 +1,10 @@
+config {
+  type: "assertion",
+  tags: ["billing_platform"],
+  description: "O dedup do staging e uma chave (source_row_fp) por linha de origem, exceto export_time. Nenhum fingerprint pode aparecer 2x. (assert_stg_grain_unique no sentido estrito falharia — validation #09 mostrou 2.302 splits legitimos com custos distintos; e o output achatado repete linhas de origem distintas de forma legitima.)"
+}
+
+SELECT source_row_fp, COUNT(*) AS n
+FROM ${ref("stg_billing_platform")}
+GROUP BY source_row_fp
+HAVING COUNT(*) > 1

@@ -1,0 +1,143 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&family=Ubuntu+Mono:wght@400;700&display=swap">
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Ubuntu,"Segoe UI",system-ui,sans-serif;background:#fcfcfb;color:#1d1d1b;font-size:15px;line-height:1.55}
+  h1,h2,h3{margin:0;font-weight:500;letter-spacing:-.01em}
+  .mono{font-family:"Ubuntu Mono",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
+  .eyebrow{font:500 11px/1.4 Ubuntu,sans-serif;letter-spacing:.22em;text-transform:uppercase;color:#5b626c}
+  a{color:#1a365d}a:hover{color:#0f2136}
+</style>
+</helmet>
+
+<div style="width:1440px;background:#fcfcfb">
+
+  <div style="display:flex;align-items:center;gap:12px;height:52px;padding:0 28px;background:#1d1d1b;color:#f2f1ec">
+    <svg width="24" height="16" viewBox="0 0 26 18" aria-hidden="true"><path d="M2 18 L2 12 L7 10 L7 18 Z" fill="#ffb302"/><path d="M10 18 L10 7 L15 5 L15 18 Z" fill="#ffb302"/><path d="M18 18 L18 2 L23 0 L23 18 Z" fill="#ffb302"/></svg>
+    <span style="font-weight:500">CI Polaris</span><span style="color:#a7abb0;font-size:13px">· controle de custo</span>
+    <span style="flex:1"></span>
+    <span class="mono" style="font-size:11px;border:1px solid #4a4a44;border-radius:999px;padding:4px 9px;color:#d9d6cc">amostra · validação 2026-09-09</span>
+  </div>
+
+  <div style="display:flex;gap:0;padding:0 20px;border-bottom:1px solid #e7e3d8;background:#fcfcfb;font-size:13.5px">
+    <span style="padding:13px 12px 11px;color:#5b626c">Visão geral</span>
+    <span style="padding:13px 12px 11px;color:#5b626c">Orçamento</span>
+    <span style="padding:13px 12px 11px;color:#5b626c">Tendência</span>
+    <span style="padding:13px 12px 11px;color:#1d1d1b;border-bottom:2px solid #ffb302;font-weight:500">Alocação</span>
+    <span style="padding:13px 12px 11px;color:#5b626c">Serviços &amp; SKUs</span>
+    <span style="padding:13px 12px 11px;color:#5b626c">Otimização</span>
+    <span style="padding:13px 12px 11px;color:#5b626c">Unit economics</span>
+    <span style="padding:13px 12px 11px;color:#5b626c">Anomalias</span>
+  </div>
+
+  <div style="padding:24px 28px 36px;display:flex;flex-direction:column;gap:20px">
+
+    <div style="display:flex;flex-direction:column;gap:3px">
+      <span class="eyebrow">Rateio por app / ambiente</span>
+      <h1 style="font-size:22px">Alocação · showback</h1>
+      <p style="margin:0;color:#5b626c;font-size:13.5px;max-width:74ch">Rateio a partir das labels <span class="mono">app</span> / <span class="mono">environment</span> / <span class="mono">managed-by</span>. Rollout iniciado em 26/08 (<span class="mono">atlas/docs/finops-labels.md</span>).</p>
+    </div>
+
+    <div style="display:flex;gap:12px;padding:14px 16px;background:rgba(214,69,0,.08);border:1px solid rgba(214,69,0,.25);border-radius:6px;font-size:13px;color:#8a3a1e">
+      <span aria-hidden="true">▲</span>
+      <span><b>Cobertura de label 4–10% do custo.</b> O rateio abaixo cobre só a fração já rotulada — não use para chargeback ainda.</span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:2fr 1.2fr;gap:16px">
+
+      <div style="background:#fff;border:1px solid #e7e3d8;border-radius:8px;padding:20px">
+        <h3 style="font-size:15px">Cobertura de label · por custo</h3>
+        <p style="margin:2px 0 0;color:#8b9099;font-size:12.5px">Fração do custo líquido total (<span class="mono">R$ 26,41</span>) com cada chave preenchida.</p>
+        <div style="margin-top:16px;display:flex;gap:34px">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:7px">
+            <svg viewBox="0 0 64 64" style="width:66px;height:66px"><circle cx="32" cy="32" r="26" fill="none" stroke="#f4f1ea" stroke-width="8"/><circle cx="32" cy="32" r="26" fill="none" stroke="#1a365d" stroke-width="8" stroke-dasharray="163.4" stroke-dashoffset="147" transform="rotate(-90 32 32)"/></svg>
+            <span class="mono" style="font-weight:700;font-size:15px">10%</span>
+            <span style="font-size:11.5px;color:#5b626c">managed-by</span>
+            <span class="mono" style="font-size:11px;color:#8b9099">R$ 2,63</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:7px">
+            <svg viewBox="0 0 64 64" style="width:66px;height:66px"><circle cx="32" cy="32" r="26" fill="none" stroke="#f4f1ea" stroke-width="8"/><circle cx="32" cy="32" r="26" fill="none" stroke="#1a365d" stroke-width="8" stroke-dasharray="163.4" stroke-dashoffset="157" transform="rotate(-90 32 32)"/></svg>
+            <span class="mono" style="font-weight:700;font-size:15px">4%</span>
+            <span style="font-size:11.5px;color:#5b626c">app</span>
+            <span class="mono" style="font-size:11px;color:#8b9099">R$ 1,07</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:7px">
+            <svg viewBox="0 0 64 64" style="width:66px;height:66px"><circle cx="32" cy="32" r="26" fill="none" stroke="#f4f1ea" stroke-width="8"/><circle cx="32" cy="32" r="26" fill="none" stroke="#1a365d" stroke-width="8" stroke-dasharray="163.4" stroke-dashoffset="157" transform="rotate(-90 32 32)"/></svg>
+            <span class="mono" style="font-weight:700;font-size:15px">4%</span>
+            <span style="font-size:11.5px;color:#5b626c">environment</span>
+            <span class="mono" style="font-size:11px;color:#8b9099">R$ 1,10</span>
+          </div>
+        </div>
+        <div style="margin-top:18px;padding-top:16px;border-top:1px solid #e7e3d8">
+          <div style="font:500 10px/1.3 Ubuntu;letter-spacing:.14em;text-transform:uppercase;color:#5b626c;margin-bottom:10px">Progressão da cobertura (por semana)</div>
+          <svg viewBox="0 0 380 90" style="display:block;width:100%;height:auto;font-family:'Ubuntu Mono',monospace">
+            <line x1="30" y1="75" x2="370" y2="75" stroke="#d8d3c4" stroke-width="1"/>
+            <line x1="30" y1="15" x2="370" y2="15" stroke="#d8d3c4" stroke-width="1" opacity=".6"/>
+            <text x="24" y="79" text-anchor="end" font-size="9" fill="#5b626c">0%</text>
+            <text x="24" y="19" text-anchor="end" font-size="9" fill="#5b626c">15%</text>
+            <polyline points="30,75 98,74 166,60 234,52 302,44 370,45" fill="none" stroke="#1a365d" stroke-width="2"/>
+            <circle cx="370" cy="45" r="3" fill="#1a365d" stroke="#f4f1ea" stroke-width="1.5"/>
+            <text x="30" y="88" font-size="9" fill="#5b626c">18/ago</text>
+            <text x="370" y="88" text-anchor="end" font-size="9" fill="#5b626c">08/set</text>
+          </svg>
+        </div>
+      </div>
+
+      <div style="background:#fff;border:1px solid #e7e3d8;border-radius:8px;padding:20px;display:flex;flex-direction:column;gap:14px">
+        <div>
+          <span style="font:500 10px/1.3 Ubuntu;letter-spacing:.14em;text-transform:uppercase;color:#5b626c">Custo não-alocado</span>
+          <div class="mono" style="font-weight:700;font-size:30px;letter-spacing:-.02em;color:#d64500;margin-top:4px">R$ 23,78</div>
+          <div style="font-size:12px;color:#5b626c">90% do custo · sem <span class="mono">app</span> nem <span class="mono">environment</span></div>
+        </div>
+        <div style="border-top:1px solid #e7e3d8;padding-top:14px">
+          <span style="font:500 10px/1.3 Ubuntu;letter-spacing:.14em;text-transform:uppercase;color:#5b626c">Prontidão de chargeback</span>
+          <div class="mono" style="font-weight:700;font-size:20px;margin:4px 0 8px">10% — não pronto</div>
+          <div style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:#5b626c">
+            <span><span style="color:#059669">✓</span> labels padrão via <span class="mono">default_labels</span> (Terraform)</span>
+            <span><span style="color:#d64500">✗</span> cobertura ≥ 95% do custo</span>
+            <span><span style="color:#d64500">✗</span> dono definido por <span class="mono">app</span></span>
+            <span><span style="color:#b7791f">~</span> recursos manuais (secrets) sem label</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div style="background:#fff;border:1px solid #e7e3d8;border-radius:8px;padding:20px">
+        <h3 style="font-size:15px">Custo alocado por app</h3>
+        <p style="margin:2px 0 0;color:#8b9099;font-size:12.5px">Da fração com label <span class="mono">app</span> (R$ 1,07).</p>
+        <div style="margin-top:14px;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:center;gap:10px"><span style="flex:0 0 150px;font-size:12.5px;color:#5b626c">atlas</span><span style="flex:1;height:14px;background:#f4f1ea;border-radius:3px"><span style="display:block;height:100%;width:56%;background:#1a365d;border-radius:3px"></span></span><span class="mono" style="flex:0 0 54px;text-align:right;font-size:12px">R$ 0,60</span></div>
+          <div style="display:flex;align-items:center;gap:10px"><span style="flex:0 0 150px;font-size:12.5px;color:#5b626c">polaris-cost-control</span><span style="flex:1;height:14px;background:#f4f1ea;border-radius:3px"><span style="display:block;height:100%;width:28%;background:#1a365d;border-radius:3px"></span></span><span class="mono" style="flex:0 0 54px;text-align:right;font-size:12px">R$ 0,30</span></div>
+          <div style="display:flex;align-items:center;gap:10px"><span style="flex:0 0 150px;font-size:12.5px;color:#5b626c">observability-hub</span><span style="flex:1;height:14px;background:#f4f1ea;border-radius:3px"><span style="display:block;height:100%;width:16%;background:#8a8f96;border-radius:3px"></span></span><span class="mono" style="flex:0 0 54px;text-align:right;font-size:12px">R$ 0,17</span></div>
+        </div>
+        <p style="margin:10px 0 0;font-size:11.5px;color:#8b9099"><span class="mono">observability-hub</span> = nome antigo do <span class="mono">atlas</span> — labels a atualizar.</p>
+      </div>
+
+      <div style="background:#fff;border:1px solid #e7e3d8;border-radius:8px;padding:20px">
+        <h3 style="font-size:15px">Custo alocado por ambiente</h3>
+        <p style="margin:2px 0 0;color:#8b9099;font-size:12.5px">Da fração com label <span class="mono">environment</span> (R$ 1,10).</p>
+        <div style="margin-top:14px;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:center;gap:10px"><span style="flex:0 0 60px;font-size:12.5px;color:#5b626c">prod</span><span style="flex:1;height:16px;background:#f4f1ea;border-radius:3px"><span style="display:block;height:100%;width:68%;background:#1a365d;border-radius:3px"></span></span><span class="mono" style="flex:0 0 54px;text-align:right;font-size:12px">R$ 0,75</span></div>
+          <div style="display:flex;align-items:center;gap:10px"><span style="flex:0 0 60px;font-size:12.5px;color:#5b626c">dev</span><span style="flex:1;height:16px;background:#f4f1ea;border-radius:3px"><span style="display:block;height:100%;width:32%;background:#059669;border-radius:3px"></span></span><span class="mono" style="flex:0 0 54px;text-align:right;font-size:12px">R$ 0,35</span></div>
+        </div>
+        <p style="margin:10px 0 0;font-size:11.5px;color:#8b9099">dev e prod dividem o mesmo projeto GCP — só a label separa.</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"$preview":{"width":1440,"height":1120}}'>
+class Component extends DCLogic {}
+</script>
+</body>
+</html>

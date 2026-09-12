@@ -1,0 +1,51 @@
+config {
+  type: "view",
+  schema: dataform.projectConfig.vars.reporting_dataset,
+  tags: ["billing_platform"],
+  description: "1 linha: KPIs do mes corrente (MTD) + mes anterior fechado + orcamento, conta inteira. Serve o scorecard da Visao geral. Sem quebra por project_id de proposito — e um card de 1 linha; um scorecard por projeto e um filtro futuro na API/UI, nao uma mudanca de grao aqui."
+}
+
+js { const c = require("includes/constants"); }
+
+WITH cur AS ( SELECT FORMAT_DATE('%Y%m', CURRENT_DATE('${dataform.projectConfig.vars.timezone}')) AS ym ),
+prev AS ( SELECT FORMAT_DATE('%Y%m', DATE_SUB(DATE_TRUNC(CURRENT_DATE('${dataform.projectConfig.vars.timezone}'), MONTH), INTERVAL 1 DAY)) AS ym ),
+cal AS (
+  SELECT
+    EXTRACT(DAY FROM CURRENT_DATE('${dataform.projectConfig.vars.timezone}')) AS days_elapsed,
+    EXTRACT(DAY FROM DATE_SUB(DATE_ADD(DATE_TRUNC(CURRENT_DATE('${dataform.projectConfig.vars.timezone}'), MONTH), INTERVAL 1 MONTH), INTERVAL 1 DAY)) AS days_in_month
+),
+mtd AS (
+  SELECT
+    SUM(gross_cost_brl)    AS gross_cost_mtd_brl,
+    SUM(credits_total_brl) AS credits_mtd_brl,
+    SUM(net_cost_brl)     AS net_cost_mtd_brl,
+    SUM(net_cost_usd)    AS net_cost_mtd_usd,
+    SUM(cost_at_list_brl) AS cost_at_list_mtd_brl
+  FROM ${ref("agg_billing_cost_monthly")} WHERE invoice_month = (SELECT ym FROM cur)
+),
+prevm AS (
+  SELECT SUM(net_cost_brl) AS prev_month_net_brl
+  FROM ${ref("agg_billing_cost_monthly")} WHERE invoice_month = (SELECT ym FROM prev)
+)
+
+SELECT
+  (SELECT ym FROM cur)                                                     AS invoice_month,
+  mtd.net_cost_mtd_brl,
+  mtd.net_cost_mtd_usd,
+  mtd.gross_cost_mtd_brl,
+  mtd.credits_mtd_brl,
+  prevm.prev_month_net_brl,
+  SAFE_DIVIDE(mtd.net_cost_mtd_brl, cal.days_elapsed) * cal.days_in_month  AS run_rate_eom_brl,
+  cal.days_elapsed,
+  cal.days_in_month,
+  SAFE_DIVIDE(
+    SAFE_DIVIDE(mtd.net_cost_mtd_brl, cal.days_elapsed) * cal.days_in_month,
+    NULLIF(prevm.prev_month_net_brl, 0)
+  ) - 1                                                                    AS mom_pct,
+  ${c.MONTHLY_BUDGET_BRL}                                                  AS budget_brl,
+  SAFE_DIVIDE(mtd.net_cost_mtd_brl, ${c.MONTHLY_BUDGET_BRL})              AS budget_used_pct,
+  SAFE_DIVIDE(
+    SAFE_DIVIDE(mtd.net_cost_mtd_brl, cal.days_elapsed) * cal.days_in_month,
+    ${c.MONTHLY_BUDGET_BRL})                                               AS run_rate_vs_budget_pct,
+  1 - SAFE_DIVIDE(mtd.net_cost_mtd_brl, NULLIF(mtd.cost_at_list_mtd_brl, 0)) AS effective_savings_pct
+FROM mtd, prevm, cal

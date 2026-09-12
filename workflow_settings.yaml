@@ -1,0 +1,21 @@
+dataformCoreVersion: 3.0.0
+
+defaultProject: dp6-ci-polaris
+defaultLocation: US
+defaultDataset: billing_platform_mart
+defaultAssertionDataset: billing_platform_assertions
+
+vars:
+  # origem (cross-project — a SA do Dataform precisa de bigquery.dataViewer aqui)
+  source_project: dp6-billing-voucher
+  source_dataset: billing_export
+  source_table: gcp_billing_export_resource_v1_008012_F93445_DFD798
+  # datasets alvo (todos em US, no dp6-ci-polaris)
+  staging_dataset: billing_platform_stg
+  mart_dataset: billing_platform_mart
+  reporting_dataset: billing_platform_reporting
+  # parâmetros travados na Fase 2 (validation/RESULTADOS.md)
+  lookback_days: "45"
+  freshness_threshold_hours: "36"
+  label_keys: "environment,app,managed-by"
+  timezone: "America/Sao_Paulo"

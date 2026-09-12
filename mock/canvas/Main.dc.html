@@ -1,0 +1,169 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&family=Ubuntu+Mono:wght@400;700&display=swap">
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Ubuntu,"Segoe UI",system-ui,sans-serif;background:#fcfcfb;color:#1d1d1b;font-size:15px;line-height:1.55}
+  h1,h2,h3{margin:0;font-weight:500;letter-spacing:-.01em}
+  .mono{font-family:"Ubuntu Mono",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
+  .eyebrow{font:500 11px/1.4 Ubuntu,sans-serif;letter-spacing:.22em;text-transform:uppercase;color:#5b626c}
+  a{color:#1a365d}a:hover{color:#0f2136}
+  table.dt{width:100%;border-collapse:collapse;font-size:13px}
+  table.dt th,table.dt td{padding:8px 10px;border-bottom:1px solid #e7e3d8;text-align:right}
+  table.dt th:first-child,table.dt td:first-child{text-align:left}
+  table.dt thead th{font:500 10px/1.4 Ubuntu,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#5b626c;border-bottom-color:#d8d3c4}
+  table.dt tr:last-child td{border-bottom:0}
+</style>
+</helmet>
+
+<div style="width:1440px;background:#fcfcfb">
+
+  <!-- topbar -->
+  <div style="display:flex;align-items:center;gap:12px;height:52px;padding:0 28px;background:#1d1d1b;color:#f2f1ec">
+    <svg width="24" height="16" viewBox="0 0 26 18" aria-hidden="true">
+      <path d="M2 18 L2 12 L7 10 L7 18 Z" fill="#ffb302"/>
+      <path d="M10 18 L10 7 L15 5 L15 18 Z" fill="#ffb302"/>
+      <path d="M18 18 L18 2 L23 0 L23 18 Z" fill="#ffb302"/>
+    </svg>
+    <span style="font-weight:500">CI Polaris</span>
+    <span style="color:#a7abb0;font-size:13px">· controle de custo</span>
+    <span style="flex:1"></span>
+    <span class="mono" style="font-size:11px;border:1px solid #4a4a44;border-radius:999px;padding:4px 9px;color:#d9d6cc">amostra · validação 2026-09-09</span>
+  </div>
+
+  <!-- tabs -->
+  <div style="display:flex;gap:0;padding:0 20px;border-bottom:1px solid #e7e3d8;background:#fcfcfb;font-size:13.5px">
+    <span style="padding:13px 12px 11px;color:#1d1d1b;border-bottom:2px solid #ffb302;font-weight:500">Visão geral</span>
+    <span style="padding:13px 12px 11px;color:#5b626c">Orçamento</span>
+    <span style="padding:13px 12px 11px;color:#5b626c">Tendência</span>
+    <span style="padding:13px 12px 11px;color:#5b626c">Alocação</span>
+    <span style="padding:13px 12px 11px;color:#5b626c">Serviços &amp; SKUs</span>
+    <span style="padding:13px 12px 11px;color:#5b626c">Otimização</span>
+    <span style="padding:13px 12px 11px;color:#5b626c">Unit economics</span>
+    <span style="padding:13px 12px 11px;color:#5b626c">Anomalias</span>
+  </div>
+
+  <!-- content -->
+  <div style="padding:24px 28px 36px;display:flex;flex-direction:column;gap:20px">
+
+    <div style="display:flex;flex-direction:column;gap:3px">
+      <span class="eyebrow">Setembro 2026 · mês corrente (MTD, 9 dias)</span>
+      <h1 style="font-size:22px">Visão geral</h1>
+      <p style="margin:0;color:#5b626c;font-size:13.5px;max-width:70ch">Custo faturado do projeto <span class="mono">dp6-ci-polaris</span> a partir do billing export. Fatura em BRL; USD pela taxa da linha.</p>
+    </div>
+
+    <!-- data health -->
+    <div style="display:flex;align-items:center;gap:10px;padding:9px 14px;background:#f4f1ea;border:1px solid #e7e3d8;border-radius:6px;font-size:12.5px;color:#5b626c">
+      <span style="width:8px;height:8px;border-radius:50%;background:#059669;flex:none"></span>
+      Export íntegro · última carga há <span class="mono">2h</span> · <span class="mono">90.226</span> linhas · 3 meses · sem lacunas
+    </div>
+
+    <!-- scorecard -->
+    <div style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:14px">
+      <div style="background:#fff;border:1px solid #e7e3d8;border-radius:8px;padding:15px;display:flex;flex-direction:column;gap:6px">
+        <span style="font:500 10px/1.3 Ubuntu;letter-spacing:.14em;text-transform:uppercase;color:#5b626c">Custo líquido · MTD</span>
+        <span class="mono" style="font-weight:700;font-size:24px;letter-spacing:-.02em">R$ 2,19</span>
+        <span style="font-size:12px;color:#5b626c"><span class="mono">US$ 0,37</span></span>
+      </div>
+      <div style="background:#fff;border:1px solid #e7e3d8;border-radius:8px;padding:15px;display:flex;flex-direction:column;gap:6px">
+        <span style="font:500 10px/1.3 Ubuntu;letter-spacing:.14em;text-transform:uppercase;color:#5b626c">Run-rate fim de mês</span>
+        <span class="mono" style="font-weight:700;font-size:24px;letter-spacing:-.02em">R$ 7,30</span>
+        <span style="font-size:12px;color:#5b626c">projeção linear · 9 de 30 dias</span>
+      </div>
+      <div style="background:#fff;border:1px solid #e7e3d8;border-radius:8px;padding:15px;display:flex;flex-direction:column;gap:6px">
+        <span style="font:500 10px/1.3 Ubuntu;letter-spacing:.14em;text-transform:uppercase;color:#5b626c">Δ vs. mês anterior</span>
+        <span class="mono" style="font-weight:700;font-size:24px;letter-spacing:-.02em;color:#059669">−69%</span>
+        <span style="font-size:12px;color:#5b626c">run-rate vs. <span class="mono">R$ 23,65</span> (ago)</span>
+      </div>
+      <div style="background:#fff;border:1px solid #e7e3d8;border-radius:8px;padding:15px;display:flex;flex-direction:column;gap:6px">
+        <span style="font:500 10px/1.3 Ubuntu;letter-spacing:.14em;text-transform:uppercase;color:#5b626c">Créditos no mês</span>
+        <span class="mono" style="font-weight:700;font-size:24px;letter-spacing:-.02em">−R$ 0,57</span>
+        <span style="font-size:12px;color:#5b626c">só <span class="mono">DISCOUNT</span> (Cloud Run)</span>
+      </div>
+      <div style="background:#fff;border:1px solid #e7e3d8;border-top:2px solid #ffb302;border-radius:8px;padding:15px;display:flex;flex-direction:column;gap:6px">
+        <span style="font:500 10px/1.3 Ubuntu;letter-spacing:.14em;text-transform:uppercase;color:#5b626c">Custo vs. orçamento</span>
+        <span class="mono" style="font-weight:700;font-size:24px;letter-spacing:-.02em">11%</span>
+        <span style="font-size:12px;color:#5b626c">de <span class="mono">R$ 20,00</span> · run-rate 37%</span>
+        <span style="display:inline-flex;align-items:center;gap:5px;align-self:flex-start;background:rgba(5,150,105,.14);color:#059669;border-radius:999px;padding:3px 8px;font-size:11px;font-weight:500">✓ dentro do orçamento</span>
+      </div>
+      <div style="background:#fff;border:1px solid #e7e3d8;border-radius:8px;padding:15px;display:flex;flex-direction:column;gap:6px">
+        <span style="font:500 10px/1.3 Ubuntu;letter-spacing:.14em;text-transform:uppercase;color:#5b626c">Economia efetiva</span>
+        <span class="mono" style="font-weight:700;font-size:24px;letter-spacing:-.02em">2,1%</span>
+        <span style="font-size:12px;color:#5b626c">só créditos · sem desconto negociado</span>
+      </div>
+    </div>
+
+    <!-- row: daily area + services -->
+    <div style="display:grid;grid-template-columns:1.55fr 1fr;gap:16px">
+
+      <div style="background:#fff;border:1px solid #e7e3d8;border-radius:8px;padding:20px">
+        <h3 style="font-size:15px">Custo líquido diário</h3>
+        <p style="margin:2px 0 0;color:#8b9099;font-size:12.5px">Área = custo do dia · linha tracejada = média móvel 7 dias. Últimos 30 dias.</p>
+        <div style="margin-top:10px;background:#f4f1ea;border-radius:6px;padding:12px 10px 6px">
+          <svg viewBox="0 0 660 200" style="display:block;width:100%;height:auto;font-family:'Ubuntu Mono',monospace" role="img" aria-label="Custo líquido diário, pico entre 21 e 26 de agosto de 2026">
+            <line x1="44" y1="175" x2="640" y2="175" stroke="#d8d3c4" stroke-width="1"/>
+            <line x1="44" y1="95"  x2="640" y2="95"  stroke="#d8d3c4" stroke-width="1" opacity=".6"/>
+            <line x1="44" y1="15"  x2="640" y2="15"  stroke="#d8d3c4" stroke-width="1" opacity=".6"/>
+            <text x="38" y="179" text-anchor="end" font-size="10" fill="#5b626c">R$ 0</text>
+            <text x="38" y="99"  text-anchor="end" font-size="10" fill="#5b626c">R$ 3</text>
+            <text x="38" y="19"  text-anchor="end" font-size="10" fill="#5b626c">R$ 6</text>
+            <path d="M44,175 L237,169 L257,39 L276,95 L296,167 L315,57 L335,15 L354,123 L374,150 L393,170 L413,170 L432,165 L452,171 L471,170 L491,170 L510,164 L530,167 L550,167 L569,168 L589,167 L608,171 L640,171 L640,175 Z" fill="#1a365d" fill-opacity=".14"/>
+            <polyline points="44,175 237,169 257,39 276,95 296,167 315,57 335,15 354,123 374,150 393,170 413,170 432,165 452,171 471,170 491,170 510,164 530,167 550,167 569,168 589,167 608,171 640,171" fill="none" stroke="#1a365d" stroke-width="2" stroke-linejoin="round"/>
+            <polyline points="44,175 237,174 257,150 276,138 296,140 315,120 335,96 354,92 374,96 393,120 413,140 432,150 452,158 471,163 491,166 510,166 530,166 550,167 569,167 589,167 608,168 640,168" fill="none" stroke="#8a8f96" stroke-width="1.5" stroke-dasharray="4 3"/>
+            <circle cx="640" cy="171" r="3.5" fill="#1a365d" stroke="#f4f1ea" stroke-width="1.5"/>
+            <text x="44"  y="193" text-anchor="middle" font-size="10" fill="#5b626c">10/ago</text>
+            <text x="257" y="193" text-anchor="middle" font-size="10" fill="#5b626c">21/ago</text>
+            <text x="393" y="193" text-anchor="middle" font-size="10" fill="#5b626c">01/set</text>
+            <text x="608" y="193" text-anchor="middle" font-size="10" fill="#5b626c">08/set</text>
+          </svg>
+        </div>
+      </div>
+
+      <div style="background:#fff;border:1px solid #e7e3d8;border-radius:8px;padding:20px">
+        <h3 style="font-size:15px">Custo por serviço</h3>
+        <p style="margin:2px 0 0;color:#8b9099;font-size:12.5px">Acumulado (R$). Cloud Run concentra 82%.</p>
+        <div style="margin-top:12px;display:flex;flex-direction:column;gap:9px">
+          <div style="display:flex;align-items:center;gap:10px"><span style="flex:0 0 112px;font-size:12.5px;color:#5b626c">Cloud Run</span><span style="flex:1;height:15px;background:#f4f1ea;border-radius:3px;overflow:hidden"><span style="display:block;height:100%;width:100%;background:#1a365d"></span></span><span class="mono" style="flex:0 0 58px;text-align:right;font-size:12.5px">R$ 21,81</span></div>
+          <div style="display:flex;align-items:center;gap:10px"><span style="flex:0 0 112px;font-size:12.5px;color:#5b626c">BigQuery</span><span style="flex:1;height:15px;background:#f4f1ea;border-radius:3px;overflow:hidden"><span style="display:block;height:100%;width:8%;background:#059669"></span></span><span class="mono" style="flex:0 0 58px;text-align:right;font-size:12.5px">R$ 1,75</span></div>
+          <div style="display:flex;align-items:center;gap:10px"><span style="flex:0 0 112px;font-size:12.5px;color:#5b626c">Secret Manager</span><span style="flex:1;height:15px;background:#f4f1ea;border-radius:3px;overflow:hidden"><span style="display:block;height:100%;width:7%;background:#8a8f96"></span></span><span class="mono" style="flex:0 0 58px;text-align:right;font-size:12.5px">R$ 1,57</span></div>
+          <div style="display:flex;align-items:center;gap:10px"><span style="flex:0 0 112px;font-size:12.5px;color:#5b626c">Artifact Registry</span><span style="flex:1;height:15px;background:#f4f1ea;border-radius:3px;overflow:hidden"><span style="display:block;height:100%;width:3.5%;background:#8a8f96"></span></span><span class="mono" style="flex:0 0 58px;text-align:right;font-size:12.5px">R$ 0,77</span></div>
+          <div style="display:flex;align-items:center;gap:10px"><span style="flex:0 0 112px;font-size:12.5px;color:#5b626c">Cloud Scheduler</span><span style="flex:1;height:15px;background:#f4f1ea;border-radius:3px;overflow:hidden"><span style="display:block;height:100%;width:2.3%;background:#8a8f96"></span></span><span class="mono" style="flex:0 0 58px;text-align:right;font-size:12.5px">R$ 0,50</span></div>
+          <div style="display:flex;align-items:center;gap:10px"><span style="flex:0 0 112px;font-size:12.5px;color:#5b626c">Cloud Storage</span><span style="flex:1;height:15px;background:#f4f1ea;border-radius:3px;overflow:hidden"><span style="display:block;height:100%;width:0.6%;background:#8a8f96"></span></span><span class="mono" style="flex:0 0 58px;text-align:right;font-size:12.5px">R$ 0,01</span></div>
+        </div>
+        <div style="display:flex;gap:14px;margin-top:12px;font-size:12px;color:#5b626c">
+          <span style="display:inline-flex;align-items:center;gap:6px"><i style="width:11px;height:11px;border-radius:2px;background:#1a365d"></i>Cloud Run</span>
+          <span style="display:inline-flex;align-items:center;gap:6px"><i style="width:11px;height:11px;border-radius:2px;background:#059669"></i>BigQuery</span>
+          <span style="display:inline-flex;align-items:center;gap:6px"><i style="width:11px;height:11px;border-radius:2px;background:#8a8f96"></i>Outros</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- reconciliation -->
+    <div style="background:#fff;border:1px solid #e7e3d8;border-radius:8px;padding:20px">
+      <h3 style="font-size:15px">Reconciliação com a fatura</h3>
+      <p style="margin:2px 0 0;color:#8b9099;font-size:12.5px">net = custo bruto + créditos. Cada mês confere com o relatório de faturamento do console.</p>
+      <table class="dt" style="margin-top:10px">
+        <thead><tr><th>Mês da fatura</th><th>Custo bruto</th><th>Créditos</th><th>Líquido</th><th>Confere</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">202607</td><td class="mono">R$ 0,00</td><td class="mono">R$ 0,00</td><td class="mono" style="font-weight:700">R$ 0,00</td><td style="color:#059669">✓</td></tr>
+          <tr><td class="mono">202608</td><td class="mono">R$ 23,65</td><td class="mono">R$ 0,00</td><td class="mono" style="font-weight:700">R$ 23,65</td><td style="color:#059669">✓</td></tr>
+          <tr><td class="mono">202609 <span style="color:#8b9099">(parcial)</span></td><td class="mono">R$ 2,75</td><td class="mono">−R$ 0,57</td><td class="mono" style="font-weight:700">R$ 2,19</td><td style="color:#059669">✓</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"$preview":{"width":1440,"height":1180}}'>
+class Component extends DCLogic {}
+</script>
+</body>
+</html>

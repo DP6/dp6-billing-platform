@@ -1,0 +1,113 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&family=Ubuntu+Mono:wght@400;700&display=swap">
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Ubuntu,"Segoe UI",system-ui,sans-serif;background:#fcfcfb;color:#1d1d1b;font-size:15px;line-height:1.55}
+  h1,h2,h3{margin:0;font-weight:500;letter-spacing:-.01em}
+  .mono{font-family:"Ubuntu Mono",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
+  .eyebrow{font:500 11px/1.4 Ubuntu,sans-serif;letter-spacing:.22em;text-transform:uppercase;color:#5b626c}
+  a{color:#1a365d}a:hover{color:#0f2136}
+  table.dt{width:100%;border-collapse:collapse;font-size:13px}
+  table.dt th,table.dt td{padding:8px 10px;border-bottom:1px solid #e7e3d8;text-align:right}
+  table.dt th:first-child,table.dt td:first-child{text-align:left}
+  table.dt thead th{font:500 10px/1.4 Ubuntu,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#5b626c;border-bottom-color:#d8d3c4}
+  table.dt tr:last-child td{border-bottom:0}
+</style>
+</helmet>
+
+<div style="width:1440px;background:#fcfcfb">
+
+  <div style="display:flex;align-items:center;gap:12px;height:52px;padding:0 28px;background:#1d1d1b;color:#f2f1ec">
+    <svg width="24" height="16" viewBox="0 0 26 18" aria-hidden="true"><path d="M2 18 L2 12 L7 10 L7 18 Z" fill="#ffb302"/><path d="M10 18 L10 7 L15 5 L15 18 Z" fill="#ffb302"/><path d="M18 18 L18 2 L23 0 L23 18 Z" fill="#ffb302"/></svg>
+    <span style="font-weight:500">CI Polaris</span><span style="color:#a7abb0;font-size:13px">· controle de custo</span>
+    <span style="flex:1"></span>
+    <span class="mono" style="font-size:11px;border:1px solid #4a4a44;border-radius:999px;padding:4px 9px;color:#d9d6cc">amostra · validação 2026-09-09</span>
+  </div>
+
+  <div style="display:flex;gap:0;padding:0 20px;border-bottom:1px solid #e7e3d8;background:#fcfcfb;font-size:13.5px">
+    <span style="padding:13px 12px 11px;color:#5b626c">Visão geral</span>
+    <span style="padding:13px 12px 11px;color:#5b626c">Orçamento</span>
+    <span style="padding:13px 12px 11px;color:#5b626c">Tendência</span>
+    <span style="padding:13px 12px 11px;color:#5b626c">Alocação</span>
+    <span style="padding:13px 12px 11px;color:#1d1d1b;border-bottom:2px solid #ffb302;font-weight:500">Serviços &amp; SKUs</span>
+    <span style="padding:13px 12px 11px;color:#5b626c">Otimização</span>
+    <span style="padding:13px 12px 11px;color:#5b626c">Unit economics</span>
+    <span style="padding:13px 12px 11px;color:#5b626c">Anomalias</span>
+  </div>
+
+  <div style="padding:24px 28px 36px;display:flex;flex-direction:column;gap:20px">
+
+    <div style="display:flex;flex-direction:column;gap:3px">
+      <span class="eyebrow">Detalhe por SKU</span>
+      <h1 style="font-size:22px">Serviços &amp; SKUs</h1>
+      <p style="margin:0;color:#5b626c;font-size:13.5px;max-width:74ch">Composição do custo por SKU e custo unitário. Chip de atenção em SKU visto pela primeira vez nos últimos 30 dias.</p>
+    </div>
+
+    <div style="display:flex;gap:12px;padding:14px 16px;background:#f4f1ea;border:1px solid #e7e3d8;border-left:2px solid #ffb302;border-radius:6px;font-size:13px;color:#5b626c">
+      <span aria-hidden="true">◆</span>
+      <span><b style="color:#1d1d1b;font-weight:500">SKU novo (últimos 30 dias):</b> <span class="mono">Cloud Run · Requests</span> — primeira ocorrência 2026-08-28. Sem histórico para comparar.</span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1.1fr 1fr;gap:16px">
+      <div style="background:#fff;border:1px solid #e7e3d8;border-radius:8px;padding:20px">
+        <h3 style="font-size:15px">Custo por serviço → SKU</h3>
+        <p style="margin:2px 0 0;color:#8b9099;font-size:12.5px">Acumulado. Cloud Run (82%) detalhado por SKU.</p>
+        <div style="margin-top:14px;display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;align-items:center;gap:10px"><span style="flex:0 0 210px;font-size:12.5px;font-weight:500">Cloud Run</span><span style="flex:1;height:15px;background:#f4f1ea;border-radius:3px"><span style="display:block;height:100%;width:100%;background:#1a365d;border-radius:3px"></span></span><span class="mono" style="flex:0 0 56px;text-align:right;font-size:12.5px">R$ 21,81</span></div>
+          <div style="display:flex;align-items:center;gap:10px;margin-left:16px"><span style="flex:0 0 194px;font-size:12px;color:#5b626c">CPU Allocation Time <span class="mono" style="color:#8b9099;font-size:10px">1.06M vCPU·s</span></span><span style="flex:1;height:12px;background:#f4f1ea;border-radius:3px"><span style="display:block;height:100%;width:73%;background:#1a365d;border-radius:3px"></span></span><span class="mono" style="flex:0 0 56px;text-align:right;font-size:11.5px">R$ 16,00</span></div>
+          <div style="display:flex;align-items:center;gap:10px;margin-left:16px"><span style="flex:0 0 194px;font-size:12px;color:#5b626c">Memory Allocation Time <span class="mono" style="color:#8b9099;font-size:10px">2.13M GiB·s</span></span><span style="flex:1;height:12px;background:#f4f1ea;border-radius:3px"><span style="display:block;height:100%;width:23%;background:#1a365d;border-radius:3px"></span></span><span class="mono" style="flex:0 0 56px;text-align:right;font-size:11.5px">R$ 5,00</span></div>
+          <div style="display:flex;align-items:center;gap:10px;margin-left:16px"><span style="flex:0 0 194px;font-size:12px;color:#5b626c">Requests <span class="mono" style="color:#8b9099;font-size:10px">48.2k</span></span><span style="flex:1;height:12px;background:#f4f1ea;border-radius:3px"><span style="display:block;height:100%;width:3%;background:#1a365d;border-radius:3px"></span></span><span class="mono" style="flex:0 0 56px;text-align:right;font-size:11.5px">R$ 0,61</span></div>
+          <div style="display:flex;align-items:center;gap:10px;margin-left:16px"><span style="flex:0 0 194px;font-size:12px;color:#5b626c">Egress América do Sul <span class="mono" style="color:#8b9099;font-size:10px">0.14 GiB</span></span><span style="flex:1;height:12px;background:#f4f1ea;border-radius:3px"><span style="display:block;height:100%;width:1%;background:#1a365d;border-radius:3px"></span></span><span class="mono" style="flex:0 0 56px;text-align:right;font-size:11.5px">R$ 0,20</span></div>
+          <div style="display:flex;align-items:center;gap:10px;margin-top:4px"><span style="flex:0 0 210px;font-size:12.5px;font-weight:500">BigQuery</span><span style="flex:1;height:15px;background:#f4f1ea;border-radius:3px"><span style="display:block;height:100%;width:8%;background:#059669;border-radius:3px"></span></span><span class="mono" style="flex:0 0 56px;text-align:right;font-size:12.5px">R$ 1,75</span></div>
+          <div style="display:flex;align-items:center;gap:10px"><span style="flex:0 0 210px;font-size:12.5px;font-weight:500">Secret Manager</span><span style="flex:1;height:15px;background:#f4f1ea;border-radius:3px"><span style="display:block;height:100%;width:7%;background:#8a8f96;border-radius:3px"></span></span><span class="mono" style="flex:0 0 56px;text-align:right;font-size:12.5px">R$ 1,57</span></div>
+          <div style="display:flex;align-items:center;gap:10px"><span style="flex:0 0 210px;font-size:12.5px;font-weight:500">Artifact Registry</span><span style="flex:1;height:15px;background:#f4f1ea;border-radius:3px"><span style="display:block;height:100%;width:3.5%;background:#8a8f96;border-radius:3px"></span></span><span class="mono" style="flex:0 0 56px;text-align:right;font-size:12.5px">R$ 0,77</span></div>
+        </div>
+      </div>
+
+      <div style="background:#fff;border:1px solid #e7e3d8;border-radius:8px;padding:20px">
+        <h3 style="font-size:15px">Top movers · ago → set</h3>
+        <p style="margin:2px 0 0;color:#8b9099;font-size:12.5px">Maior variação absoluta entre meses (setembro parcial).</p>
+        <table class="dt" style="margin-top:10px">
+          <thead><tr><th>Serviço</th><th>ago</th><th>set (MTD)</th><th>Δ</th></tr></thead>
+          <tbody>
+            <tr><td>Cloud Run</td><td class="mono">R$ 20,28</td><td class="mono">R$ 0,86</td><td class="mono" style="color:#059669">−R$ 19,42</td></tr>
+            <tr><td>BigQuery</td><td class="mono">R$ 1,44</td><td class="mono">R$ 0,02</td><td class="mono" style="color:#059669">−R$ 1,42</td></tr>
+            <tr><td>Artifact Registry</td><td class="mono">R$ 0,45</td><td class="mono">R$ 0,52</td><td class="mono" style="color:#d64500">+R$ 0,07</td></tr>
+            <tr><td>Secret Manager</td><td class="mono">R$ 0,85</td><td class="mono">R$ 0,86</td><td class="mono" style="color:#5b626c">+R$ 0,01</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div style="background:#fff;border:1px solid #e7e3d8;border-radius:8px;padding:20px">
+      <h3 style="font-size:15px">Custo unitário por SKU</h3>
+      <p style="margin:2px 0 0;color:#8b9099;font-size:12.5px">custo unitário = custo líquido ÷ uso (na unidade de preço). Amostra do período.</p>
+      <table class="dt" style="margin-top:8px">
+        <thead><tr><th>SKU</th><th>Uso</th><th>Unidade</th><th>Custo unitário</th><th>Custo</th></tr></thead>
+        <tbody>
+          <tr><td>Cloud Run · CPU Allocation Time</td><td class="mono">1,06M</td><td>vCPU·s</td><td class="mono">R$ 0,0000151</td><td class="mono">R$ 16,00</td></tr>
+          <tr><td>Cloud Run · Memory Allocation Time</td><td class="mono">2,13M</td><td>GiB·s</td><td class="mono">R$ 0,0000023</td><td class="mono">R$ 5,00</td></tr>
+          <tr><td>Cloud Run · Requests</td><td class="mono">48,2k</td><td>1k req</td><td class="mono">R$ 0,0127</td><td class="mono">R$ 0,61</td></tr>
+          <tr><td>BigQuery · Analysis</td><td class="mono">0,20</td><td>TiB</td><td class="mono">R$ 8,75</td><td class="mono">R$ 1,75</td></tr>
+          <tr><td>Secret Manager · Access operations</td><td class="mono">3,1M</td><td>10k ops</td><td class="mono">R$ 0,0051</td><td class="mono">R$ 1,57</td></tr>
+          <tr><td>Artifact Registry · Storage</td><td class="mono">0,11</td><td>GiB·mês</td><td class="mono">R$ 7,00</td><td class="mono">R$ 0,77</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"$preview":{"width":1440,"height":1080}}'>
+class Component extends DCLogic {}
+</script>
+</body>
+</html>

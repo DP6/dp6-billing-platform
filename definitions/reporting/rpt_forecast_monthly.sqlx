@@ -1,0 +1,52 @@
+config {
+  type: "view",
+  schema: dataform.projectConfig.vars.reporting_dataset,
+  tags: ["billing_platform"],
+  description: "Historico mensal + previsao linear dos proximos 3 meses com faixa, conta inteira. Historico curto -> faixa larga de proposito; recalibra sozinha conforme cresce. Sem project_id de proposito — regressao por projeto exigiria historico proprio por projeto (ainda mais curto); revisitar so depois da Fase 1 confirmar volume suficiente por projeto."
+}
+
+WITH hist AS (
+  SELECT
+    invoice_month,
+    PARSE_DATE('%Y%m', invoice_month) AS month_date,
+    SUM(net_cost_brl) AS net_cost_brl
+  FROM ${ref("agg_billing_cost_monthly")}
+  -- exclui o mes corrente (parcial) da regressao
+  WHERE invoice_month < FORMAT_DATE('%Y%m', CURRENT_DATE('${dataform.projectConfig.vars.timezone}'))
+  GROUP BY invoice_month
+),
+idx AS (
+  SELECT *, ROW_NUMBER() OVER (ORDER BY month_date) AS x FROM hist
+),
+fit AS (
+  SELECT
+    AVG(x) AS ax, AVG(net_cost_brl) AS ay,
+    SAFE_DIVIDE(SUM((x - (SELECT AVG(x) FROM idx)) * (net_cost_brl - (SELECT AVG(net_cost_brl) FROM idx))),
+               NULLIF(SUM(POW(x - (SELECT AVG(x) FROM idx), 2)), 0)) AS slope,
+    STDDEV_SAMP(net_cost_brl) AS sd,
+    MAX(x) AS max_x,
+    MAX(month_date) AS max_month
+  FROM idx
+),
+future AS (
+  SELECT n AS h, DATE_ADD((SELECT max_month FROM fit), INTERVAL n MONTH) AS month_date
+  FROM UNNEST([1, 2, 3]) AS n
+)
+
+SELECT
+  i.invoice_month,
+  i.month_date,
+  TRUE  AS is_actual,
+  i.net_cost_brl                                    AS value_brl,
+  CAST(NULL AS FLOAT64)                             AS forecast_lo_brl,
+  CAST(NULL AS FLOAT64)                             AS forecast_hi_brl
+FROM idx i
+UNION ALL
+SELECT
+  FORMAT_DATE('%Y%m', f.month_date),
+  f.month_date,
+  FALSE AS is_actual,
+  GREATEST((SELECT ay FROM fit) + (SELECT slope FROM fit) * ((SELECT max_x FROM fit) + f.h - (SELECT ax FROM fit)), 0) AS value_brl,
+  GREATEST((SELECT ay FROM fit) + (SELECT slope FROM fit) * ((SELECT max_x FROM fit) + f.h - (SELECT ax FROM fit)) - 1.5 * IFNULL((SELECT sd FROM fit), 0), 0) AS forecast_lo_brl,
+         ((SELECT ay FROM fit) + (SELECT slope FROM fit) * ((SELECT max_x FROM fit) + f.h - (SELECT ax FROM fit)) + 1.5 * IFNULL((SELECT sd FROM fit), 0))     AS forecast_hi_brl
+FROM future f
