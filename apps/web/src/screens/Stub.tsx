@@ -40,7 +40,7 @@ export function Stub({
         payload abaixo.
       </div>
       {endpoints.map((e) => (
-        <EndpointPreview key={e.path} label={e.label} path={e.path} params={e.withFilters ? filterParams(f) : { currency: f.currency }} />
+        <EndpointPreview key={e.path} label={e.label} path={e.path} params={e.withFilters ? filterParams(f) : {}} />
       ))}
     </>
   );

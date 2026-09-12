@@ -12,7 +12,7 @@ import {
   StatusBadge,
 } from "../components/ui";
 import { useApi } from "../lib/api";
-import { brl, monthLabel, monthLong, pct, pctPlain, relativeToNow, usd } from "../lib/format";
+import { brl, monthLabel, monthLong, pct, pctPlain, relativeToNow } from "../lib/format";
 import { filterParams, resolveWindow, scopeParams, useFilters } from "../lib/useFilters";
 import type {
   AppAllocation,
@@ -22,6 +22,7 @@ import type {
   Dimensions,
   EnvAllocation,
   ForecastMonth,
+  ProjectCost,
   ReconRow,
   Scorecard,
   ServiceCost,
@@ -69,10 +70,11 @@ export function VisaoGeral() {
   const dims = useApi<Dimensions>("/dimensions");
   const sc = useApi<Scorecard>("/scorecard", filterParams(f));
   const svc = useApi<ServiceCost[]>("/cost/by-service", filterParams(f));
+  const byProject = useApi<ProjectCost[]>("/cost/by-project", filterParams(f));
   const recon = useApi<ReconRow[]>("/reconciliation", scopeParams(f));
   const budget = useApi<Budget>("/budget", scopeParams(f));
-  const burndown = useApi<BurndownPoint[]>("/budget/burndown", { currency: f.currency });
-  const forecast = useApi<ForecastMonth[]>("/forecast", { horizon: "3", currency: f.currency });
+  const burndown = useApi<BurndownPoint[]>("/budget/burndown");
+  const forecast = useApi<ForecastMonth[]>("/forecast", { horizon: "3" });
   const cseries = useApi<CostSeriesPoint[]>("/cost/series", {
     ...filterParams(f),
     grain: series.grain,
@@ -95,8 +97,8 @@ export function VisaoGeral() {
         title="Visão geral"
         desc={
           <>
-            Custo faturado do projeto <span className="mono">dp6-ci-polaris</span> a partir do billing export.
-            Fatura em BRL; USD pela taxa da linha.
+            Custo faturado de toda a conta <span className="mono">008012-F93445-DFD798</span> a partir do
+            billing export — use o filtro Projeto para recortar um projeto específico.
           </>
         }
       />
@@ -176,15 +178,7 @@ export function VisaoGeral() {
           <div>
             <span style={groupEyebrow}>Período · {janela}</span>
             <MetricGrid cols={4}>
-              <MetricTile
-                label="Custo líquido"
-                value={f.currency === "USD" ? usd(s.net_cost_mtd_usd) : brl(s.net_cost_mtd_brl)}
-                sub={
-                  <span className="mono">
-                    {f.currency === "USD" ? brl(s.net_cost_mtd_brl) : usd(s.net_cost_mtd_usd)}
-                  </span>
-                }
-              />
+              <MetricTile label="Custo líquido" value={brl(s.net_cost_mtd_brl)} />
               <MetricTile
                 label="Δ vs. período anterior"
                 value={pct(s.mom_pct)}
@@ -378,6 +372,24 @@ export function VisaoGeral() {
             ))}
         </Panel>
 
+        <Panel title="Custo por projeto" cap={`Acumulado · ${janela}.`}>
+          <LoadingOrError loading={byProject.loading} error={byProject.error} />
+          {byProject.data &&
+            (byProject.data.length === 0 ? (
+              <p style={{ color: "var(--ink-mute)", fontSize: 13 }}>Sem custo no período/recorte.</p>
+            ) : (
+              <HBars
+                rows={byProject.data.map((r) => ({
+                  label: r.project_name,
+                  value: r.net_cost_brl,
+                  pct: r.pct_of_total,
+                }))}
+              />
+            ))}
+        </Panel>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
         <Panel
           title="Custo por app e ambiente"
           cap="Só a fração do custo com a label preenchida (hoje ~10%). Detalhe na aba Alocação."
