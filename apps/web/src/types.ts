@@ -7,13 +7,17 @@ export interface Meta {
   invoice_months: string[];
   export_ok: boolean;
 }
+export interface Project {
+  project_id: string;
+  project_name: string;
+}
 export interface Dimensions {
   services: string[];
   environments: string[];
   apps: string[];
+  projects: Project[];
   invoice_months: string[];
   data_updated_at: string;
-  currency_rate: number;
   export_ok: boolean;
   source_rows: number;
 }
@@ -46,6 +50,12 @@ export interface CostSeriesPoint {
 }
 export interface ServiceCost {
   service_description: string;
+  net_cost_brl: number;
+  pct_of_total: number;
+}
+export interface ProjectCost {
+  project_id: string;
+  project_name: string;
   net_cost_brl: number;
   pct_of_total: number;
 }
@@ -173,6 +183,8 @@ export interface WaterfallStep {
 }
 export interface AnomalyRow {
   usage_date: string;
+  project_id: string;
+  project_name: string;
   service_description: string;
   net_cost_brl: number;
   avg_28d_brl: number;

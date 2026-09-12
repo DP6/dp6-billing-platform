@@ -15,13 +15,14 @@ import type { CostSeriesPoint } from "../types";
 import { chartColor } from "./palette";
 
 export type Grain = "day" | "month";
-export type GroupBy = "none" | "service" | "environment" | "app";
+export type GroupBy = "none" | "service" | "environment" | "app" | "project";
 
 const GROUP_LABEL: Record<GroupBy, string> = {
   none: "Nenhum",
   service: "Serviço",
   environment: "Ambiente",
   app: "App",
+  project: "Projeto",
 };
 
 const MAX_SERIES = 5;

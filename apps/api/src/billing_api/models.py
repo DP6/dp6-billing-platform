@@ -12,13 +12,18 @@ class MetaDTO(BaseModel):
     export_ok: bool
 
 
+class ProjectDTO(BaseModel):
+    project_id: str
+    project_name: str
+
+
 class DimensionsDTO(BaseModel):
     services: list[str]
     environments: list[str]
     apps: list[str]
+    projects: list[ProjectDTO]
     invoice_months: list[str]
     data_updated_at: str
-    currency_rate: float
     export_ok: bool
     source_rows: int
 
@@ -58,6 +63,13 @@ class CostSeriesPointDTO(BaseModel):
 
 class ServiceCostDTO(BaseModel):
     service_description: str
+    net_cost_brl: float
+    pct_of_total: float
+
+
+class ProjectCostDTO(BaseModel):
+    project_id: str
+    project_name: str
     net_cost_brl: float
     pct_of_total: float
 
@@ -217,6 +229,8 @@ class WaterfallStepDTO(BaseModel):
 
 class AnomalyRowDTO(BaseModel):
     usage_date: str
+    project_id: str
+    project_name: str
     service_description: str
     net_cost_brl: float
     avg_28d_brl: float
