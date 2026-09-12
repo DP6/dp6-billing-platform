@@ -53,7 +53,7 @@ async def _data_freshness_header(request: Request, call_next):
 # SPA: o build do apps/web e copiado para BILLING_API_STATIC_DIR (/app/static na imagem).
 # Serve os assets e faz fallback de qualquer rota nao-/api para index.html (react-router).
 # Em dev local a var fica vazia e o Vite serve o front.
-_static = Path(S.static_dir) if S.static_dir else None
+_static = Path(S.static_dir).resolve() if S.static_dir else None
 if _static and (_static / "index.html").is_file():
     app.mount("/assets", StaticFiles(directory=_static / "assets"), name="assets")
 
@@ -61,7 +61,10 @@ if _static and (_static / "index.html").is_file():
     def _spa(full_path: str) -> FileResponse:
         if full_path.startswith(("api/", "healthz")):
             raise HTTPException(status_code=404)
-        candidate = _static / full_path
-        if full_path and candidate.is_file():
+        # full_path vem cru da URL: sem resolve() + is_relative_to(), um "%2e%2e%2f" (../ que o
+        # uvicorn decodifica antes de rotear) escapa do diretorio estatico e serve qualquer
+        # arquivo do container.
+        candidate = (_static / full_path).resolve()
+        if full_path and candidate.is_relative_to(_static) and candidate.is_file():
             return FileResponse(candidate)
         return FileResponse(_static / "index.html")
