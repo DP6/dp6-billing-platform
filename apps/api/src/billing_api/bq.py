@@ -6,6 +6,8 @@ import logging
 import time
 from typing import Any
 
+from fastapi import HTTPException
+
 from .config import get_settings
 
 log = logging.getLogger("billing_api.bq")
@@ -52,15 +54,25 @@ def query(sql: str, params: dict[str, Any] | None = None) -> list[dict[str, Any]
     if hit and now - hit[0] < s.cache_ttl_seconds:
         return hit[1]
 
+    from google.api_core.exceptions import Forbidden, NotFound
     from google.cloud import bigquery
 
     job_params = [
         bigquery.ScalarQueryParameter(k, _bq_type(v), v) for k, v in (params or {}).items()
     ]
-    job = _get_client().query(
-        sql, job_config=bigquery.QueryJobConfig(query_parameters=job_params)
-    )
-    rows = [dict(r) for r in job.result()]
+    try:
+        job = _get_client().query(
+            sql, job_config=bigquery.QueryJobConfig(query_parameters=job_params)
+        )
+        rows = [dict(r) for r in job.result()]
+    except (NotFound, Forbidden) as exc:
+        # tabela/view ainda nao materializada (1a execucao do Dataform pendente) ou sem grant
+        # na origem — nao vaza detalhe de infra (nome de dataset, job id) pro cliente.
+        log.warning("dado ainda indisponivel no BigQuery: %s", exc)
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "data_not_ready", "message": "Dados ainda não disponíveis — o pipeline de custo ainda não rodou pela primeira vez."},
+        ) from exc
     _cache[key] = (now, rows)
     return rows
 
