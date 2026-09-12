@@ -57,14 +57,15 @@ _static = Path(S.static_dir).resolve() if S.static_dir else None
 if _static and (_static / "index.html").is_file():
     app.mount("/assets", StaticFiles(directory=_static / "assets"), name="assets")
 
+    # O conteudo estatico e imutavel (copiado para a imagem no build), entao o conjunto de
+    # arquivos servveis e fixado aqui no startup. O caminho da URL vira chave de busca neste
+    # dict e nunca e concatenado no filesystem -- sem concatenacao nao ha travessia possivel
+    # ("%2e%2e%2f", que o uvicorn decodifica para "../" antes de rotear, simplesmente nao casa
+    # com nenhuma chave e cai no fallback do index.html).
+    _servable = {p.relative_to(_static).as_posix(): p for p in _static.rglob("*") if p.is_file()}
+
     @app.get("/{full_path:path}", include_in_schema=False)
     def _spa(full_path: str) -> FileResponse:
         if full_path.startswith(("api/", "healthz")):
             raise HTTPException(status_code=404)
-        # full_path vem cru da URL: sem resolve() + is_relative_to(), um "%2e%2e%2f" (../ que o
-        # uvicorn decodifica antes de rotear) escapa do diretorio estatico e serve qualquer
-        # arquivo do container.
-        candidate = (_static / full_path).resolve()
-        if full_path and candidate.is_relative_to(_static) and candidate.is_file():
-            return FileResponse(candidate)
-        return FileResponse(_static / "index.html")
+        return FileResponse(_servable.get(full_path) or _static / "index.html")
