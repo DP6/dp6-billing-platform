@@ -15,7 +15,8 @@ variable "env_vars" {
   default = {}
 }
 
-# quem pode abrir a pagina (via IAP). Ex: ["group:gcp-billing-platform@dp6.com.br"]
+# quem pode abrir a pagina (via IAP). Ex: ["group:algum-grupo@dp6.com.br", "user:fulano@dp6.com.br"]
+# Atencao: membro inexistente nao gera erro no apply — a policy do IAP so fica vazia e ninguem entra.
 variable "allowed_members" {
   type = list(string)
 }

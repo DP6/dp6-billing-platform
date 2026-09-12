@@ -41,9 +41,10 @@ variable "time_zone" {
   default = "America/Sao_Paulo"
 }
 
+# sem default de proposito: o default herdado apontava para um grupo inexistente e teria
+# mandado os alertas para o vazio em silencio. Cada environment passa o seu.
 variable "alert_email" {
-  type    = string
-  default = "gcp-billing-platform@dp6.com.br"
+  type = string
 }
 variable "freshness_threshold_hours" {
   type    = number

@@ -1,4 +1,4 @@
-# Alerta de falha do Dataform -> e-mail para gcp-billing-platform@dp6.com.br.
+# Alerta de falha do Dataform -> e-mail para o destino definido em var.alert_email.
 # Politica log-based sobre o log de conclusao de workflowInvocation com estado FAILED.
 
 resource "google_monitoring_notification_channel" "email" {
