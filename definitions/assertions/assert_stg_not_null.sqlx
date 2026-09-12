@@ -1,0 +1,17 @@
+config {
+  type: "assertion",
+  tags: ["billing_platform"],
+  description: "Campos-chave nao nulos + invoice_month parseavel + net = gross + creditos (cross-field)."
+}
+
+SELECT
+  usage_start_time, invoice_month, service_description, cost_type, gross_cost_brl,
+  'campo-chave nulo ou invoice_month invalido ou net != gross + creditos' AS motivo
+FROM ${ref("stg_billing_platform")}
+WHERE usage_date IS NULL
+   OR invoice_month IS NULL
+   OR invoice_month_date IS NULL
+   OR service_description IS NULL
+   OR cost_type IS NULL
+   OR gross_cost_brl IS NULL
+   OR ABS(net_cost_brl - (gross_cost_brl + credits_total_brl)) > 0.0000001

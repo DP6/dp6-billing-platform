@@ -1,0 +1,29 @@
+config {
+  type: "view",
+  schema: dataform.projectConfig.vars.reporting_dataset,
+  tags: ["billing_platform"],
+  description: "Degraus preco-de-tabela -> desconto negociado -> creditos -> liquido (acumulado), conta inteira. Herdado do polaris-cost-model (validation #08 la achou desconto negociado = 0 — reconfirmar na Fase 1 pra conta inteira). Serve a aba Unit economics. Sem project_id de proposito — e um waterfall de 1 linha; por projeto seria N waterfalls, decisao de UI futura."
+}
+
+WITH agg AS (
+  SELECT
+    SUM(cost_at_list_brl)   AS cost_at_list_brl,
+    SUM(gross_cost_brl)     AS gross_cost_brl,
+    SUM(credits_total_brl)  AS credits_total_brl,
+    SUM(net_cost_brl)      AS net_cost_brl
+  FROM ${ref("agg_billing_cost_monthly")}
+)
+
+SELECT 'cost_at_list' AS step, 1 AS ord, 'start'    AS kind, cost_at_list_brl AS value_brl FROM agg
+UNION ALL
+SELECT 'negotiated_discount', 2, 'decrease', -(cost_at_list_brl - gross_cost_brl) FROM agg
+UNION ALL
+SELECT 'credits',             3, 'decrease', credits_total_brl FROM agg
+UNION ALL
+SELECT 'net_cost',            4, 'end',      net_cost_brl FROM agg
+UNION ALL
+SELECT '_effective_savings_pct', 5, 'meta',
+  1 - SAFE_DIVIDE((SELECT net_cost_brl FROM agg), NULLIF((SELECT cost_at_list_brl FROM agg), 0)) FROM agg
+UNION ALL
+SELECT '_cost_avoided_brl', 6, 'meta',
+  (SELECT (cost_at_list_brl - gross_cost_brl) + (-credits_total_brl) FROM agg) FROM agg

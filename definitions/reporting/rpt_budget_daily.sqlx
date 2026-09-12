@@ -1,0 +1,35 @@
+config {
+  type: "view",
+  schema: dataform.projectConfig.vars.reporting_dataset,
+  tags: ["billing_platform"],
+  description: "Burn-down do mes corrente: custo liquido acumulado por dia vs. orcamento e thresholds, conta inteira. Serve o grafico de consumo acumulado da aba Orcamento. Sem project_id de proposito — o orcamento hoje e um numero unico da conta (MONTHLY_BUDGET_BRL, TBD pos-Fase-1); orcamento por projeto e um conceito que ainda nao existe."
+}
+
+js { const c = require("includes/constants"); }
+
+WITH days AS (
+  SELECT d AS usage_date
+  FROM UNNEST(GENERATE_DATE_ARRAY(
+    DATE_TRUNC(CURRENT_DATE('${dataform.projectConfig.vars.timezone}'), MONTH),
+    LAST_DAY(CURRENT_DATE('${dataform.projectConfig.vars.timezone}'))
+  )) AS d
+),
+daily AS (
+  SELECT usage_date, SUM(net_cost_brl) AS net_cost_brl
+  FROM ${ref("fct_billing_cost_daily")}
+  WHERE invoice_month = FORMAT_DATE('%Y%m', CURRENT_DATE('${dataform.projectConfig.vars.timezone}'))
+  GROUP BY usage_date
+)
+
+SELECT
+  days.usage_date,
+  (days.usage_date <= CURRENT_DATE('${dataform.projectConfig.vars.timezone}'))  AS is_realized,
+  IFNULL(daily.net_cost_brl, 0)                                                 AS net_cost_day_brl,
+  SUM(IFNULL(daily.net_cost_brl, 0)) OVER (ORDER BY days.usage_date)            AS net_cost_cum_brl,
+  ${c.MONTHLY_BUDGET_BRL}                                                       AS budget_brl,
+  ${c.MONTHLY_BUDGET_BRL} * 0.5   AS threshold_50_brl,
+  ${c.MONTHLY_BUDGET_BRL} * 0.8   AS threshold_80_brl,
+  ${c.MONTHLY_BUDGET_BRL} * 1.0   AS threshold_100_brl,
+  ${c.MONTHLY_BUDGET_BRL} * 1.2   AS threshold_120_brl
+FROM days
+LEFT JOIN daily USING (usage_date)

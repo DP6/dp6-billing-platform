@@ -1,0 +1,58 @@
+config {
+  type: "incremental",
+  schema: dataform.projectConfig.vars.mart_dataset,
+  tags: ["billing_platform"],
+  description: "Fato diario de custo. Grao: invoice_month x usage_date x project x service x sku x pricing_unit x location x cost_type x label_environment x label_app x label_managed_by. `project_id`/`project_name` adicionados em relacao ao polaris-cost-model (que so cobria 1 projeto) — ver docs/adr/.",
+  // uniqueKey aponta pro grain_key sintetico (ver SELECT), nao pras colunas de grao cruas.
+  // Motivo: sem uniqueKey, updatePartitionFilter nao substitui a particao -- cada run
+  // incremental duplicava as SUMs do grao dentro do lookback (incidente 2026-09-11, herdado
+  // do polaris-cost-model). Mas ~90-96% das linhas tem label_* NULL (so 4-10% de cobertura), e
+  // MERGE do BigQuery nao casa NULL = NULL (vira UNKNOWN) -- um uniqueKey direto nas colunas de
+  // label nunca daria MATCH pra elas e o bug voltaria pra quase todas as linhas. grain_key trata
+  // NULL como '' só para fins de hash; label_environment/app/managed_by (e project_name, que
+  // tambem pode vir NULL) continuam NULL de verdade na tabela.
+  uniqueKey: ["grain_key"],
+  bigquery: {
+    partitionBy: "usage_date",
+    clusterBy: ["service_description", "label_app"],
+    updatePartitionFilter: "usage_date >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 45 DAY)"
+  }
+}
+
+js { const c = require("includes/constants"); }
+
+SELECT
+  invoice_month,
+  invoice_month_date,
+  usage_date,
+  project_id,
+  ANY_VALUE(project_name) AS project_name, -- descritivo de project_id; nao entra no grao pra nao fragmentar se o nome mudar
+  service_description,
+  sku_description,
+  pricing_unit,
+  location_location,
+  cost_type,
+  label_environment,
+  label_app,
+  label_managed_by,
+
+  TO_HEX(MD5(CONCAT(
+    invoice_month, '|', CAST(usage_date AS STRING), '|', IFNULL(project_id, ''), '|', service_description, '|',
+    IFNULL(sku_description, ''), '|', IFNULL(pricing_unit, ''), '|', IFNULL(location_location, ''), '|',
+    cost_type, '|', IFNULL(label_environment, ''), '|', IFNULL(label_app, ''), '|', IFNULL(label_managed_by, '')
+  ))) AS grain_key,
+
+  SUM(gross_cost_brl)                 AS gross_cost_brl,
+  SUM(credits_total_brl)              AS credits_total_brl,
+  SUM(net_cost_brl)                   AS net_cost_brl,
+  SUM(cost_at_list_brl)              AS cost_at_list_brl,
+  SUM(gross_cost_usd)                AS gross_cost_usd,
+  SUM(net_cost_usd)                  AS net_cost_usd,
+  SUM(usage_amount_pricing_units)    AS usage_amount_pricing_units,
+  COUNT(*)                           AS line_count
+
+FROM ${ref("stg_billing_platform")}
+${when(incremental(), `WHERE ${c.lookbackFilter("usage_date")}`)}
+GROUP BY
+  invoice_month, invoice_month_date, usage_date, project_id, service_description, sku_description,
+  pricing_unit, location_location, cost_type, label_environment, label_app, label_managed_by

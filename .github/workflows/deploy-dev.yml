@@ -1,0 +1,96 @@
+name: Deploy dev
+
+# Dispara em push em develop (depois do merge manual da PR automática). Cada job fica atrás
+# do gate do Environment dev-deploy (reviewers obrigatórios, configurado via gh api — ver
+# terraform/bootstrap/README ou o plano da promoção). Só depois de dev suceder de verdade
+# (terraform apply + deploy do app) é que abre a PR automática develop -> main.
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - "apps/**"
+      - "terraform/environments/**"
+      - "terraform/modules/**"
+      - ".github/workflows/deploy-dev.yml"
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write
+
+concurrency: deploy-dev
+
+env:
+  REGION: us-central1
+  AR: us-central1-docker.pkg.dev/dp6-ci-polaris/apps
+
+jobs:
+  terraform-apply:
+    runs-on: ubuntu-latest
+    environment: dev-deploy
+    defaults:
+      run:
+        working-directory: terraform/environments/dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER_APPLY }}
+          service_account: ${{ secrets.WIF_SA_APPLY }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.9"
+
+      - run: terraform init -input=false
+      - run: terraform apply -input=false -auto-approve
+
+  apps-deploy:
+    runs-on: ubuntu-latest
+    environment: dev-deploy
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER_APPLY }}
+          service_account: ${{ secrets.WIF_SA_APPLY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: docker auth
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      # servico unico: a imagem da API ja embute o build do SPA (apps/web).
+      # contexto = raiz do repo para o Dockerfile enxergar apps/web e apps/api.
+      - name: build & push
+        run: |
+          IMG="${AR}/billing-platform-api:${GITHUB_SHA::12}"
+          docker build -f apps/api/Dockerfile -t "$IMG" .
+          docker push "$IMG"
+          echo "IMG=$IMG" >> "$GITHUB_ENV"
+
+      - name: deploy dev
+        run: |
+          gcloud run deploy billing-platform-api-dev \
+            --region "$REGION" --image "$IMG" --quiet
+
+  promote-to-main:
+    needs: [terraform-apply, apps-deploy]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: abre PR develop -> main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr create --base main --head develop \
+            --title "Promote develop -> main ($(date +%Y-%m-%d))" \
+            --body "Promoção automática — dev aplicado e aprovado com sucesso (run ${{ github.run_id }})." \
+            || echo "PR develop->main já existe, nada a fazer."

@@ -1,0 +1,14 @@
+.git
+**/node_modules
+**/dist
+**/.venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.ruff_cache
+terraform
+specs
+docs
+validation
+mock
+*.md

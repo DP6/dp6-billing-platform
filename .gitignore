@@ -1,0 +1,27 @@
+# Dataform
+.df-credentials.json
+.dataform/
+
+# Node / build (apps/)
+node_modules/
+dist/
+.venv/
+__pycache__/
+.ruff_cache/
+.pytest_cache/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars
+!terraform.tfvars.example
+crash.log
+
+# scratch / regeneráveis
+validation/RESULTADOS*.raw.txt
+mock/painel-finops-ci-polaris.html
+
+# OS
+.DS_Store
+apps/api/uv.lock

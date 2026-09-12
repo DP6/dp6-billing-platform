@@ -1,0 +1,43 @@
+name: Apps CI
+
+on:
+  pull_request:
+    paths:
+      - "apps/**"
+      - ".github/workflows/apps-*.yml"
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+      - name: setup uv
+        run: pipx install uv
+      - run: uv sync --dev
+      - name: ruff (lint — advisory)
+        continue-on-error: true
+        run: uv run ruff check .
+      - name: pytest (modo mock)
+        env:
+          BILLING_API_MOCK: "1"
+        run: uv run pytest
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci || npm install
+      - name: biome (lint/format — advisory)
+        continue-on-error: true
+        run: npm run lint
+      - run: npm run typecheck
+      - run: npm run build

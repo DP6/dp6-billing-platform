@@ -1,0 +1,38 @@
+# Recomendacoes de otimizacao (aba Otimizacao & waste).
+# Lista curada — a este volume o ganho e governanca, nao R$. Revisar periodicamente.
+# specs/003 decisao #2: automatizar depois via Cloud Asset Inventory / Atlas.
+
+- title: "Escalar Cloud Run dev a zero fora do horario"
+  evidence: "backend-dev / frontend-dev com min-instances=1 24/7; trafego so em horario comercial."
+  savings_min_brl: 2.0
+  savings_max_brl: 4.0
+  effort: "baixo"
+  status: "aberta"
+
+- title: "CPU only-on-request em servicos de baixa carga"
+  evidence: "CPU always-allocated paga vCPU-s ocioso; CPU Allocation Time e R$ 16 de R$ 21,81 do Cloud Run."
+  savings_min_brl: 1.0
+  savings_max_brl: 2.0
+  effort: "baixo"
+  status: "aberta"
+
+- title: "Politica de limpeza no Artifact Registry"
+  evidence: "Imagens antigas sem tag de release acumulam storage; manter as ultimas 10 por repositorio."
+  savings_min_brl: 0.3
+  savings_max_brl: 0.3
+  effort: "baixo"
+  status: "aberta"
+
+- title: "Retencao do log bucket _Default em dev"
+  evidence: "Hoje R$ 0 (free tier), mas 30d de retencao; 7d em dev e preventivo antes do volume subir."
+  savings_min_brl: 0.0
+  savings_max_brl: 0.0
+  effort: "baixo"
+  status: "aberta"
+
+- title: "Budget por label app/environment"
+  evidence: "dev e prod dividem o projeto sem orcamento separado; sem label obrigatoria nao da para alertar por app."
+  savings_min_brl: 0.0
+  savings_max_brl: 0.0
+  effort: "médio"
+  status: "aberta"

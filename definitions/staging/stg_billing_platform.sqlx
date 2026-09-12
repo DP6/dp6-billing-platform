@@ -1,0 +1,105 @@
+config {
+  type: "incremental",
+  schema: dataform.projectConfig.vars.staging_dataset,
+  tags: ["billing_platform"],
+  description: "Billing export limpo e deduplicado. 1 linha por linha de origem. Janela movel de lookback_days reprocessada a cada run (updatePartitionFilter + uniqueKey absorvem o restatement).",
+  // uniqueKey obrigatorio: sem ele, updatePartitionFilter NAO substitui a particao —
+  // o Dataform so faz INSERT puro (sem MATCH), duplicando a janela de lookback a cada
+  // run incremental (incidente 2026-09-11: fct/scorecard triplicaram no ar). Com
+  // uniqueKey, o MERGE gerado casa por source_row_fp e faz UPDATE em vez de INSERT
+  // quando a mesma linha de origem reaparece dentro do lookback.
+  uniqueKey: ["source_row_fp"],
+  bigquery: {
+    partitionBy: "usage_date",
+    clusterBy: ["service_description", "sku_description"],
+    updatePartitionFilter: "usage_date >= DATE_SUB(CURRENT_DATE('America/Sao_Paulo'), INTERVAL 45 DAY)"
+  },
+  assertions: {
+    nonNull: ["usage_date", "invoice_month", "service_description", "cost_type", "gross_cost_brl"]
+  }
+}
+
+js {
+  const c = require("includes/constants");
+}
+
+-- Restatement: a origem reescreve linhas historicas por semanas (fechamento de fatura
+-- reexporta ate ~31 dias depois). A cada run reprocessamos os ultimos lookback_days e o
+-- updatePartitionFilter substitui essas particoes. --full-refresh mensal consolida o mes fechado.
+
+WITH src AS (
+  SELECT s.*
+  FROM ${ref(dataform.projectConfig.vars.source_table)} AS s
+  ${when(incremental(), `WHERE ${c.lookbackFilter("DATE(s.usage_start_time)")}`)}
+),
+
+-- Dedup: sem chave natural. Mata so reexport 100% identico da origem, exceto export_time
+-- (validation #09: 528 grupos assim). Splits legitimos (custos distintos na mesma dimensao)
+-- sao mantidos e somados nas marts. assert_fct_reconciliation contra a fatura e a rede de
+-- seguranca. source_row_fp = fingerprint dessa chave, persistida para assert_stg_no_exact_duplicate
+-- (o output achatado do staging perde colunas da origem, entao duas linhas de origem distintas
+--  podem projetar identico -- isso e legitimo e nao deve falhar a assertion).
+keyed AS (
+  SELECT
+    r.*,
+    FARM_FINGERPRINT(TO_JSON_STRING((SELECT AS STRUCT r.* EXCEPT (export_time)))) AS source_row_fp
+  FROM src AS r
+),
+
+deduped AS (
+  SELECT k.*
+  FROM keyed AS k
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY source_row_fp
+    ORDER BY k.export_time DESC
+  ) = 1
+)
+
+SELECT
+  billing_account_id,
+  service.id                                          AS service_id,
+  service.description                                 AS service_description,
+  sku.id                                              AS sku_id,
+  sku.description                                     AS sku_description,
+  project.id                                          AS project_id,
+  project.name                                        AS project_name,
+  usage_start_time,
+  usage_end_time,
+  DATE(usage_start_time)                              AS usage_date,
+  TIMESTAMP_TRUNC(usage_start_time, HOUR)             AS usage_hour,
+  invoice.month                                       AS invoice_month,
+  PARSE_DATE('%Y%m', invoice.month)                   AS invoice_month_date,
+  cost_type,
+  transaction_type,
+  seller_name,
+  location.location                                   AS location_location,
+  location.region                                     AS location_region,
+  location.country                                    AS location_country,
+  resource.global_name                                AS resource_global_name,
+  usage.amount_in_pricing_units                       AS usage_amount_pricing_units,
+  usage.pricing_unit                                  AS pricing_unit,
+  currency,
+  currency_conversion_rate,
+
+  -- medidas em BRL (moeda da billing account)
+  cost                                                                          AS gross_cost_brl,
+  (SELECT IFNULL(SUM(cr.amount), 0) FROM UNNEST(credits) cr)                     AS credits_total_brl,
+  cost + (SELECT IFNULL(SUM(cr.amount), 0) FROM UNNEST(credits) cr)             AS net_cost_brl,
+  cost_at_list                                                                  AS cost_at_list_brl,
+
+  -- creditos por tipo (latentes: nao sobem para as marts, mas ficam disponiveis)
+  (SELECT IFNULL(SUM(cr.amount),0) FROM UNNEST(credits) cr WHERE cr.type = 'COMMITTED_USAGE_DISCOUNT') AS credits_cud_brl,
+  (SELECT IFNULL(SUM(cr.amount),0) FROM UNNEST(credits) cr WHERE cr.type = 'SUSTAINED_USAGE_DISCOUNT') AS credits_sud_brl,
+  (SELECT IFNULL(SUM(cr.amount),0) FROM UNNEST(credits) cr WHERE cr.type = 'DISCOUNT')                 AS credits_spend_based_brl,
+  (SELECT IFNULL(SUM(cr.amount),0) FROM UNNEST(credits) cr WHERE cr.type IN ('FREE_TIER','PROMOTION')) AS credits_free_promo_brl,
+
+  -- USD derivado por linha (validation #10: 1 taxa/mes, mes aberto varia)
+  SAFE_DIVIDE(cost, currency_conversion_rate)                                                          AS gross_cost_usd,
+  SAFE_DIVIDE(cost + (SELECT IFNULL(SUM(cr.amount),0) FROM UNNEST(credits) cr), currency_conversion_rate) AS net_cost_usd,
+
+  -- labels achatadas (environment, app, managed-by) -> label_environment, label_app, label_managed_by
+  ${c.labelColumns("d")},
+
+  export_time,
+  source_row_fp
+FROM deduped AS d

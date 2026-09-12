@@ -1,0 +1,76 @@
+name: Deploy prod
+
+# Dispara em push em main (depois do merge manual da PR develop -> main aberta por
+# deploy-dev.yml). Cada job fica atras do gate do Environment prod-deploy (reviewers
+# obrigatorios, configurado via gh api). Builda a propria imagem a partir do commit de main
+# (que e sempre uma promocao 1:1 do que ja rodou em dev, nunca uma edicao no meio) em vez de
+# reaproveitar a imagem de dev por retag -- mais simples, mesmo padrao do deploy-dev.yml.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/**"
+      - "terraform/environments/**"
+      - "terraform/modules/**"
+      - ".github/workflows/deploy-prod.yml"
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency: deploy-prod
+
+env:
+  REGION: us-central1
+  AR: us-central1-docker.pkg.dev/dp6-ci-polaris/apps
+
+jobs:
+  terraform-apply:
+    runs-on: ubuntu-latest
+    environment: prod-deploy
+    defaults:
+      run:
+        working-directory: terraform/environments/prod
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER_APPLY }}
+          service_account: ${{ secrets.WIF_SA_APPLY }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.9"
+
+      - run: terraform init -input=false
+      - run: terraform apply -input=false -auto-approve
+
+  apps-deploy:
+    runs-on: ubuntu-latest
+    environment: prod-deploy
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER_APPLY }}
+          service_account: ${{ secrets.WIF_SA_APPLY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: docker auth
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: build & push
+        run: |
+          IMG="${AR}/billing-platform-api:${GITHUB_SHA::12}"
+          docker build -f apps/api/Dockerfile -t "$IMG" .
+          docker push "$IMG"
+          echo "IMG=$IMG" >> "$GITHUB_ENV"
+
+      - name: deploy prod
+        run: |
+          gcloud run deploy billing-platform-api-prod \
+            --region "$REGION" --image "$IMG" --quiet

@@ -1,0 +1,6 @@
+# Todos os valores tem default em variables.tf. Copie para terraform.tfvars so se precisar mudar.
+# project_id          = "dp6-ci-polaris"
+# project_number      = "209825626529"
+# region              = "us-central1"
+# github_repo         = "DP6/dp6-billing-platform"
+# state_bucket        = "dp6-ci-polaris-tfstate-billing-platform"
