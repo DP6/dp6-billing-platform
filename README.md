@@ -11,10 +11,11 @@ billing export em vez da view de um único projeto) e o grão (ganha `project_id
 como dimensão, já que agora há múltiplos projetos nos dados). Ver o plano completo:
 `~/.claude/plans/preciso-criar-uma-vers-o-encapsulated-willow.md`.
 
-## Estado (2026-09-11)
+## Estado (2026-09-12)
 
-**Só o esqueleto foi criado — nada rodado, nada aplicado no GCP, nada commitado/pushado.**
-O que já foi feito, mecanicamente, a partir do `polaris-cost-model`:
+**Código e repositório prontos; nada aplicado no GCP ainda.**
+
+Já feito:
 
 - Estrutura de diretórios e todos os arquivos copiados e renomeados (datasets, SAs, secrets,
   nome do repo Dataform, imagem/serviço Cloud Run, tag `billing_platform`).
@@ -23,29 +24,40 @@ O que já foi feito, mecanicamente, a partir do `polaris-cost-model`:
   (declaration `definitions/sources/billing_export_resource.sqlx`).
 - `docs/adr/ADR-003-acesso-direto-tabela-bruta.md` reescrita documentando a divergência do
   padrão de authorized view do repo-irmão.
+- **Grão com projeto**: `project_id`/`project_name` no fato, no rollup mensal, na view de
+  anomalia (z-score por projeto × serviço), na assertion de reconciliação e em 6 das 13 views
+  de `reporting/`. As outras 7 ficaram de fora **de propósito** — são cards/gauges de 1 linha
+  ou catálogo global de SKU; o motivo está na `description` de cada `.sqlx`.
+- **Verificado**: `dataform compile` → 23 ações, sem erro. `terraform fmt -check -recursive`
+  limpo e `terraform validate` OK em `bootstrap`, `environments/dev` e `environments/prod`.
+- **GitHub**: repo criado (público), branches `develop` (default) e `main`, Environments
+  `dev-deploy` (branch `develop`) e `prod-deploy` (branch `main`) com reviewers obrigatórios e
+  `can_admins_bypass=false`. PR #1 aberta com todo o conteúdo, mirando `develop`.
 
-**Ainda pendente** (ver plano, Fases 1–7):
+Pendente:
 
-- Fase 1 — rodar a suíte de `validation/*.sql` contra a tabela bruta (ainda apontam pro
-  padrão herdado; parâmetros travados em `includes/constants.js`/ADR-005 são do repo-irmão e
-  quase certamente não valem na escala da conta inteira).
-- Fase 2 — adicionar `project_id`/`project_name` ao grão do fato e das 13 views `reporting/`
-  (staging já lê `project.id`; fato/reporting ainda não propagam).
-- Fase 3/5 — Terraform e CI/CD ainda não testados (`dataform compile`, `terraform validate`
-  não rodados nesta cópia).
-- Fase 4 — apps (`api`/`web`) ainda com textos/env vars do `polaris-cost-model`, sem filtro de
-  projeto na UI.
-- Fase 6 — acesso: grant da TI **ainda não solicitado** (texto pronto em
-  `terraform/bootstrap/outputs.tf` → `external_access_request`).
-- Fase 7 — `README.md`/`CLAUDE.md` (este) e specs ainda descrevendo o estado herdado, não uma
-  spec própria validada.
-- Repo GitHub `DP6/dp6-billing-platform` **ainda não criado** — isto é só uma cópia local.
+- **Bootstrap no GCP** — `terraform apply` em `terraform/bootstrap/` nunca rodou. Enquanto não
+  rodar, não existem as SAs nem o WIF, e os checks `plan (dev)`/`plan (prod)` da PR falham no
+  passo de auth (é esperado, não é bug de código). Depois do apply: rodar o
+  `github_secrets_cmd` para setar os 4 secrets de WIF no repo.
+- **Acesso à origem** — grant da TI no dataset `billing_export` para
+  `sa-billing-platform-dataform@dp6-ci-polaris` (texto pronto em
+  `terraform/bootstrap/outputs.tf` → `external_access_request`). A SA precisa existir (ou seja,
+  bootstrap aplicado) para o grant valer.
+- **Fase 1 — validação**: `validation/*.sql` ainda não foram rodadas contra a tabela nova.
+  Os parâmetros de negócio em `includes/constants.js` (orçamento, limiares de anomalia,
+  `DEPLOY_COUNT_PER_MONTH`) estão marcados como herdados do repo-irmão e **não valem** na
+  escala da conta inteira — ver ADR-005.
+- **Fase 4 — apps**: `api`/`web` ainda têm textos e fixtures do `polaris-cost-model` e não
+  expõem filtro por projeto na UI, apesar das views já terem a dimensão.
+- **Fluxo `develop → main`** ainda não exercitado ponta a ponta.
+- Rulesets/branch protection: não configurados (o `polaris-cost-model` também não tem).
 
 ## Dataform — rodar local
 
 ```bash
 cd ~/ci-polaris/dp6-billing-platform
-npx -y @dataform/cli@3.0.0 compile          # ainda não confirmado nesta cópia
+npx -y @dataform/cli@3.0.0 compile          # 23 ações, verificado em 2026-09-11
 ```
 
 ## Estrutura
