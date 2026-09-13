@@ -1,5 +1,5 @@
 import { HBars } from "../charts/HBars";
-import { DataTable, LoadingOrError, PageHeader, Panel, WarningCallout } from "../components/ui";
+import { DataTable, LoadingOrError, PageHeader, Panel } from "../components/ui";
 import { useApi } from "../lib/api";
 import { brl, brlPrecise, dayLabel, num } from "../lib/format";
 import { filterParams, resolveWindow, useFilters } from "../lib/useFilters";
@@ -52,18 +52,20 @@ export function Servicos() {
       />
 
       {newSkus.data && newSkus.data.length > 0 && (
-        <WarningCallout>
-          <span style={{ display: "block", marginBottom: 4 }}>
-            {newSkus.data.length === 1 ? "1 SKU novo" : `${newSkus.data.length} SKUs novos`} nos últimos 30 dias — sem histórico pra comparar:
-          </span>
-          <ul style={{ margin: 0, paddingLeft: 18 }}>
-            {newSkus.data.map((s) => (
-              <li key={`${s.service_description}|${s.sku_description}`}>
-                {s.service_description} · {s.sku_description} — 1ª ocorrência {dayLabel(s.first_seen_date)}
-              </li>
-            ))}
-          </ul>
-        </WarningCallout>
+        <Panel
+          title="SKUs novos"
+          cap={`${newSkus.data.length === 1 ? "1 SKU novo" : `${newSkus.data.length} SKUs novos`} nos últimos 30 dias — sem histórico pra comparar.`}
+        >
+          <DataTable
+            rows={newSkus.data}
+            search={(s) => `${s.service_description} ${s.sku_description}`}
+            cols={[
+              { key: "svc", label: "Serviço", render: (s: NewSku) => s.service_description, sort: (s) => s.service_description },
+              { key: "sku", label: "SKU", render: (s: NewSku) => s.sku_description, sort: (s) => s.sku_description },
+              { key: "d", label: "1ª ocorrência", render: (s: NewSku) => <span className="mono">{dayLabel(s.first_seen_date)}</span>, sort: (s) => s.first_seen_date },
+            ]}
+          />
+        </Panel>
       )}
 
       <Panel title="Custo por serviço" cap={`Acumulado no período · ${dayLabel(win.from)} a ${dayLabel(win.to)}.`}>
