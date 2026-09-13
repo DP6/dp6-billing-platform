@@ -1,12 +1,9 @@
 import { HBars } from "../charts/HBars";
 import { DataTable, LoadingOrError, PageHeader, Panel, WarningCallout } from "../components/ui";
 import { useApi } from "../lib/api";
-import { brl, dayLabel, num } from "../lib/format";
+import { brl, brlPrecise, dayLabel, num } from "../lib/format";
 import { filterParams, resolveWindow, useFilters } from "../lib/useFilters";
 import type { MonthlyServicePoint, NewSku, SkuCost } from "../types";
-
-/** Custo unitário chega em BRL fracionário (ex. R$/req) — até 7 casas, como a spec pede. */
-const unitBrl = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 7 })}`;
 
 interface Mover {
   service_description: string;
@@ -56,29 +53,22 @@ export function Servicos() {
 
       {newSkus.data && newSkus.data.length > 0 && (
         <WarningCallout>
-          SKU novo — {newSkus.data.map((s) => `${s.service_description} · ${s.sku_description} (1ª ocorrência ${dayLabel(s.first_seen_date)})`).join("; ")}. Sem histórico para comparar.
+          <span style={{ display: "block", marginBottom: 4 }}>
+            {newSkus.data.length === 1 ? "1 SKU novo" : `${newSkus.data.length} SKUs novos`} nos últimos 30 dias — sem histórico pra comparar:
+          </span>
+          <ul style={{ margin: 0, paddingLeft: 18 }}>
+            {newSkus.data.map((s) => (
+              <li key={`${s.service_description}|${s.sku_description}`}>
+                {s.service_description} · {s.sku_description} — 1ª ocorrência {dayLabel(s.first_seen_date)}
+              </li>
+            ))}
+          </ul>
         </WarningCallout>
       )}
 
-      <Panel title="Custo por serviço → SKU" cap={`Acumulado no período · ${dayLabel(win.from)} a ${dayLabel(win.to)}.`}>
+      <Panel title="Custo por serviço" cap={`Acumulado no período · ${dayLabel(win.from)} a ${dayLabel(win.to)}.`}>
         <LoadingOrError loading={skuCost.loading} error={skuCost.error} />
-        {bySku.length > 0 && (
-          <>
-            <HBars rows={serviceRows.map(([label, value]) => ({ label, value }))} />
-            <div style={{ marginTop: 14 }}>
-              <DataTable
-                rows={[...bySku].sort((a, b) => b.net_cost_brl - a.net_cost_brl)}
-                cols={[
-                  { key: "svc", label: "Serviço", render: (r: SkuCost) => r.service_description },
-                  { key: "sku", label: "SKU", render: (r: SkuCost) => r.sku_description },
-                  { key: "unit", label: "Unidade", render: (r: SkuCost) => r.pricing_unit },
-                  { key: "qty", label: "Uso", num: true, render: (r: SkuCost) => <span className="mono">{num(r.usage_qty, 2)}</span> },
-                  { key: "cost", label: "Custo", num: true, render: (r: SkuCost) => <strong>{brl(r.net_cost_brl)}</strong> },
-                ]}
-              />
-            </div>
-          </>
-        )}
+        {bySku.length > 0 && <HBars rows={serviceRows.map(([label, value]) => ({ label, value }))} />}
       </Panel>
 
       <Panel title="Top movers · mês anterior → mês corrente" cap="Maior variação absoluta no topo.">
@@ -87,9 +77,9 @@ export function Servicos() {
           <DataTable
             rows={movers}
             cols={[
-              { key: "s", label: "Serviço", render: (r: Mover) => r.service_description },
-              { key: "p", label: "Mês anterior", num: true, render: (r: Mover) => brl(r.prev) },
-              { key: "c", label: "Mês corrente", num: true, render: (r: Mover) => brl(r.curr) },
+              { key: "s", label: "Serviço", render: (r: Mover) => r.service_description, sort: (r) => r.service_description },
+              { key: "p", label: "Mês anterior", num: true, render: (r: Mover) => brl(r.prev), sort: (r) => r.prev },
+              { key: "c", label: "Mês corrente", num: true, render: (r: Mover) => brl(r.curr), sort: (r) => r.curr },
               {
                 key: "d",
                 label: "Δ",
@@ -100,22 +90,27 @@ export function Servicos() {
                     {brl(r.delta)}
                   </strong>
                 ),
+                sort: (r) => Math.abs(r.delta),
               },
             ]}
           />
         )}
       </Panel>
 
-      <Panel title="Custo unitário por SKU" cap="Custo líquido ÷ uso no período · amostra do período.">
+      <Panel title="Composição serviço → SKU" cap="Mesma base do gráfico acima, detalhada por SKU — inclui custo unitário no período.">
         <LoadingOrError loading={skuCost.loading} error={skuCost.error} />
         {bySku.length > 0 && (
           <DataTable
-            rows={[...bySku].sort((a, b) => b.net_cost_brl - a.net_cost_brl)}
+            rows={bySku}
+            defaultPageSize={20}
+            search={(r) => `${r.service_description} ${r.sku_description}`}
             cols={[
-              { key: "svc", label: "Serviço · SKU", render: (r: SkuCost) => `${r.service_description} · ${r.sku_description}` },
+              { key: "svc", label: "Serviço", render: (r: SkuCost) => r.service_description, sort: (r) => r.service_description },
+              { key: "sku", label: "SKU", render: (r: SkuCost) => r.sku_description, sort: (r) => r.sku_description },
               { key: "unit", label: "Unidade", render: (r: SkuCost) => r.pricing_unit },
-              { key: "uc", label: "Custo unitário", num: true, render: (r: SkuCost) => <span className="mono">{unitBrl(r.unit_cost_brl)}</span> },
-              { key: "cost", label: "Custo", num: true, render: (r: SkuCost) => brl(r.net_cost_brl) },
+              { key: "qty", label: "Uso", num: true, render: (r: SkuCost) => <span className="mono">{num(r.usage_qty, 2)}</span>, sort: (r) => r.usage_qty },
+              { key: "uc", label: "Custo unitário", num: true, render: (r: SkuCost) => <span className="mono">{brlPrecise(r.unit_cost_brl)}</span>, sort: (r) => r.unit_cost_brl },
+              { key: "cost", label: "Custo", num: true, render: (r: SkuCost) => <strong>{brl(r.net_cost_brl)}</strong>, sort: (r) => r.net_cost_brl },
             ]}
           />
         )}

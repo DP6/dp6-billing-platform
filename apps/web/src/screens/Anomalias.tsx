@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { DataTable, LoadingOrError, MetricGrid, MetricTile, PageHeader, Panel, WarningCallout } from "../components/ui";
+import { DataTable, LoadingOrError, MetricGrid, MetricTile, PageHeader, Panel } from "../components/ui";
 import { useApi } from "../lib/api";
 import { brl, dayLabel, pct } from "../lib/format";
 import { filterParams, useFilters } from "../lib/useFilters";
@@ -49,16 +49,17 @@ export function Anomalias() {
         <MetricTile label="Regra ativa" value="z > 3 · > R$ 1" sub="janela 28 dias" />
       </MetricGrid>
 
-      <Panel title="Ocorrências" cap={'Uma linha por dia sinalizado · "Dar baixa" é só visual (localStorage), não persiste no servidor.'}>
+      <Panel title="Ocorrências" cap={'Uma linha por dia sinalizado · "Dar baixa" só esconde a linha neste navegador (localStorage) — não avisa ninguém, não apaga o dado, some se limpar o navegador.'}>
         {open.length === 0 && !anomalies.loading ? (
           <p style={{ color: "var(--ink-dim)", fontSize: 13 }}>Nenhuma anomalia em aberto no recorte atual.</p>
         ) : (
           <DataTable
             rows={open}
+            search={(r) => r.service_description}
             cols={[
-              { key: "d", label: "Data", render: (r: AnomalyRow) => <span className="mono">{dayLabel(r.usage_date)}</span> },
-              { key: "s", label: "Serviço · valor do dia", render: (r: AnomalyRow) => `${r.service_description} · ${brl(r.net_cost_brl)}` },
-              { key: "z", label: "z", num: true, render: (r: AnomalyRow) => <span className="mono">{r.z_score.toFixed(1)}</span> },
+              { key: "d", label: "Data", render: (r: AnomalyRow) => <span className="mono">{dayLabel(r.usage_date)}</span>, sort: (r) => r.usage_date },
+              { key: "s", label: "Serviço · valor do dia", render: (r: AnomalyRow) => `${r.service_description} · ${brl(r.net_cost_brl)}`, sort: (r) => r.service_description },
+              { key: "z", label: "z", num: true, render: (r: AnomalyRow) => <span className="mono">{r.z_score.toFixed(1)}</span>, sort: (r) => r.z_score },
               {
                 key: "dev",
                 label: "Média 28d · desvio",
@@ -67,6 +68,7 @@ export function Anomalias() {
                     {brl(r.avg_28d_brl)} · <strong style={{ color: "var(--status-error-foreground)" }}>+{brl(r.deviation_abs_brl)} ({pct(r.deviation_pct)})</strong>
                   </>
                 ),
+                sort: (r) => r.deviation_abs_brl,
               },
               {
                 key: "a",
@@ -75,6 +77,7 @@ export function Anomalias() {
                   <button
                     type="button"
                     onClick={() => dismiss(r)}
+                    title="Só marca como visto neste navegador (localStorage) — não persiste no servidor, não é visto por outras pessoas nem em outro dispositivo."
                     style={{
                       padding: "4px 10px",
                       fontSize: 12,
@@ -93,11 +96,6 @@ export function Anomalias() {
           />
         )}
       </Panel>
-
-      <WarningCallout>
-        Verifique se as datas sinalizadas coincidem com uma janela conhecida de deploy/carga
-        (ver aba Tendência) antes de tratar como incidente.
-      </WarningCallout>
     </>
   );
 }

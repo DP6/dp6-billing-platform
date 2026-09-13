@@ -3,7 +3,7 @@ import { RingStat } from "../charts/RingStat";
 import { Waterfall } from "../charts/Waterfall";
 import { Chip, DataTable, LoadingOrError, MetricGrid, MetricTile, PageHeader, Panel, WarningCallout } from "../components/ui";
 import { useApi } from "../lib/api";
-import { brl, dayLabel } from "../lib/format";
+import { brl, brlPrecise, dayLabel } from "../lib/format";
 import { resolveWindow, useFilters } from "../lib/useFilters";
 import type { CommitmentCoverage, Recommendations, UnitEconomics, UnitSeriesPoint, WaterfallStep } from "../types";
 
@@ -24,7 +24,11 @@ export function Eficiencia() {
   const series = useApi<UnitSeriesPoint[]>("/unit-economics/series", { metric: "cost_per_1k_req", from: win.from, to: win.to });
   const recs = useApi<Recommendations>("/optimization/recommendations");
 
-  const costAvoided = commitment.data ? commitment.data.eligible_spend_brl * commitment.data.covered_pct : undefined;
+  // `_cost_avoided_brl` é uma linha "meta" que efficiency_waterfall devolve junto dos degraus
+  // (desconto negociado + créditos, já calculado em rpt_savings_waterfall) — não é derivado
+  // aqui no front. shape() do Waterfall.tsx ignora essa linha ao desenhar os degraus.
+  const costAvoided = waterfall.data?.find((s) => s.label === "_cost_avoided_brl")?.value_brl;
+  const waterfallSteps = waterfall.data?.filter((s) => s.kind !== "meta");
 
   return (
     <>
@@ -37,34 +41,32 @@ export function Eficiencia() {
       <LoadingOrError loading={unit.loading} error={unit.error} />
       {unit.data && (
         <MetricGrid cols={4}>
-          <MetricTile label="Custo por deploy" value={brl(unit.data.cost_per_deploy_brl)} sub={<Chip tone="ok">config · {unit.data.deploy_count}/mês</Chip>} />
-          <MetricTile label="Custo por 1k requests" value={brl(unit.data.cost_per_1k_req_brl)} />
-          <MetricTile label="Custo por GB de log" value={brl(unit.data.cost_per_gib_log_brl)} sub="free tier" />
+          <MetricTile label="Custo por deploy" value={brlPrecise(unit.data.cost_per_deploy_brl)} sub={<Chip tone="ok">config · {unit.data.deploy_count}/mês</Chip>} />
+          <MetricTile label="Custo por 1k requests" value={brlPrecise(unit.data.cost_per_1k_req_brl)} />
+          <MetricTile label="Custo por GB de log" value={brlPrecise(unit.data.cost_per_gib_log_brl)} sub="free tier" />
           <MetricTile label="Custo médio por dia" value={brl(unit.data.cost_per_day_avg_30d_brl)} sub="média móvel 30d" />
         </MetricGrid>
       )}
 
       <Panel title="Do preço de tabela ao custo real" cap="cost_at_list → descontos → créditos → net_cost.">
         <LoadingOrError loading={waterfall.loading} error={waterfall.error} />
-        {waterfall.data && <Waterfall steps={waterfall.data} />}
+        {waterfallSteps && waterfallSteps.length > 0 && <Waterfall steps={waterfallSteps} />}
       </Panel>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, alignItems: "center" }}>
         <MetricTile
           label="Custo evitado (acumulado)"
           value={costAvoided != null ? brl(costAvoided) : "—"}
-          sub={<Chip tone="ok">derivado · eligible × cobertura</Chip>}
+          sub="desconto negociado + créditos — mesmo cálculo do waterfall ao lado"
         />
-        <Panel title="Cobertura de compromissos">
+        <Panel
+          title="Cobertura de compromissos"
+          cap="Fração do consumo elegível coberta por CUD/SUD (desconto por compromisso de uso mínimo, 1-3 anos). 0% = tudo sob demanda, sem nenhum compromisso firmado."
+        >
           <LoadingOrError loading={commitment.loading} error={commitment.error} />
           {commitment.data && (
             <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
               <RingStat pct={commitment.data.covered_pct} label="on-demand → committed" />
-              {commitment.data.covered_pct === 0 && commitment.data.on_demand_spend_brl < commitment.data.cud_reeval_threshold_brl && (
-                <p style={{ margin: 0, fontSize: 12.5, color: "var(--ink-dim)" }}>
-                  CUD/SUD não compensa abaixo de ~{brl(commitment.data.cud_reeval_threshold_brl)}/mês estável.
-                </p>
-              )}
             </div>
           )}
         </Panel>
@@ -86,14 +88,24 @@ export function Eficiencia() {
         </Panel>
       )}
 
-      <Panel title="Custo por request · por dia" cap={`Estável ~${unit.data ? brl(unit.data.cost_per_1k_req_brl) : "—"}/1k req — sem regressão.`}>
+      <Panel title="Custo por request · por dia" cap={`~${unit.data ? brlPrecise(unit.data.cost_per_1k_req_brl) : "—"} a cada 1k requests — valor sub-centavo, por isso o eixo usa mais casas decimais.`}>
         <LoadingOrError loading={series.loading} error={series.error} />
         {series.data && series.data.length > 0 && (
-          <AreaTrend data={series.data.map((p) => ({ label: dayLabel(p.usage_date), value: p.value_brl }))} />
+          <AreaTrend
+            data={series.data.map((p) => ({ label: dayLabel(p.usage_date), value: p.value_brl }))}
+            formatValue={brlPrecise}
+          />
         )}
       </Panel>
 
-      <Panel title="Recomendações" cap={recs.data ? `Economia potencial: ${brl(recs.data.potential_savings_min_brl)}–${brl(recs.data.potential_savings_max_brl)}/mês.` : undefined}>
+      <Panel
+        title="Recomendações"
+        cap={
+          recs.data
+            ? `Lista curada à mão (recommendations.yaml), não calculada do billing ao vivo — números do texto podem ficar desatualizados. Economia potencial somada: ${brl(recs.data.potential_savings_min_brl)}–${brl(recs.data.potential_savings_max_brl)}/mês.`
+            : undefined
+        }
+      >
         <LoadingOrError loading={recs.loading} error={recs.error} />
         {recs.data && recs.data.items.length > 0 ? (
           <DataTable

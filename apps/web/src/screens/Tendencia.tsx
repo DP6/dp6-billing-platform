@@ -1,7 +1,7 @@
 import { MomBars, type MomBarPoint } from "../charts/MomBars";
 import { PaceChart, type PacePoint } from "../charts/PaceChart";
 import { TemporalChart } from "../charts/TemporalChart";
-import { LoadingOrError, PageHeader, Panel, WarningCallout } from "../components/ui";
+import { LoadingOrError, PageHeader, Panel } from "../components/ui";
 import { useApi } from "../lib/api";
 import { monthLabel } from "../lib/format";
 import { scopeParams, useFilters } from "../lib/useFilters";
@@ -112,11 +112,6 @@ export function Tendencia() {
         <LoadingOrError loading={daily.loading} error={daily.error} />
         <PaceChart data={paceData(daily.data)} />
       </Panel>
-
-      <WarningCallout>
-        O custo se concentra em dias úteis de deploy/carga; fora dessas janelas o consumo cai
-        pra um piso residual (Secret Manager, storage parado).
-      </WarningCallout>
     </>
   );
 }

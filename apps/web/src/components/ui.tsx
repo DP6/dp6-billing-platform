@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import { type CSSProperties, type ReactNode, useMemo, useState } from "react";
 
 export function Card({ title, cap, children }: { title?: string; cap?: string; children: ReactNode }) {
   return (
@@ -194,38 +194,189 @@ export function Chip({ tone, children }: { tone: "ok" | "warn" | "bad"; children
   );
 }
 
+const PAGE_SIZE_OPTIONS = [5, 10, 20, 50, 100];
+
+export interface DataTableCol<T> {
+  key: string;
+  label: string;
+  num?: boolean;
+  render: (r: T, i: number) => ReactNode;
+  /** Valor bruto pra ordenar por essa coluna (clique no cabeçalho alterna asc/desc).
+   *  Sem isso a coluna não fica clicável — `render` sozinho não dá pra comparar. */
+  sort?: (r: T) => string | number;
+}
+
+/** Tabela com paginação, tamanho de página e ordenação por coluna — mesmo padrão do Atlas.
+ *  `search`, quando passado, liga o campo de busca (filtra por substring, sem acento/caixa). */
 export function DataTable<T>({
   cols,
   rows,
+  search,
+  defaultPageSize = 10,
 }: {
-  cols: { key: string; label: string; num?: boolean; render: (r: T, i: number) => ReactNode }[];
+  cols: DataTableCol<T>[];
   rows: T[];
+  /** Texto pesquisável da linha inteira — sem isso o campo de busca não aparece. */
+  search?: (r: T) => string;
+  defaultPageSize?: number;
 }) {
+  const [query, setQuery] = useState("");
+  const [pageSize, setPageSize] = useState(defaultPageSize);
+  const [page, setPage] = useState(0);
+  const [sort, setSort] = useState<{ key: string; dir: 1 | -1 } | null>(null);
+
+  const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+  const filtered = useMemo(() => {
+    if (!search || !query.trim()) return rows;
+    const q = norm(query.trim());
+    return rows.filter((r) => norm(search(r)).includes(q));
+  }, [rows, search, query]);
+
+  const sorted = useMemo(() => {
+    if (!sort) return filtered;
+    const col = cols.find((c) => c.key === sort.key);
+    if (!col?.sort) return filtered;
+    return [...filtered].sort((a, b) => {
+      const va = col.sort!(a);
+      const vb = col.sort!(b);
+      const cmp = typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb), "pt-BR");
+      return cmp * sort.dir;
+    });
+  }, [filtered, sort, cols]);
+
+  const pageCount = Math.max(1, Math.ceil(sorted.length / pageSize));
+  const clampedPage = Math.min(page, pageCount - 1);
+  const pageRows = sorted.slice(clampedPage * pageSize, clampedPage * pageSize + pageSize);
+
+  const toggleSort = (col: DataTableCol<T>) => {
+    if (!col.sort) return;
+    setPage(0);
+    setSort((s) => {
+      if (s?.key !== col.key) return { key: col.key, dir: col.num ? -1 : 1 }; // numérica começa desc, texto asc
+      return { key: col.key, dir: s.dir === 1 ? -1 : 1 };
+    });
+  };
+
   return (
-    <div style={{ overflowX: "auto" }}>
-      <table className="dt">
-        <thead>
-          <tr>
-            {cols.map((c) => (
-              <th key={c.key}>{c.label}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r, i) => (
-            <tr key={i}>
+    <div>
+      {search && (
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setPage(0);
+          }}
+          placeholder="Buscar nesta tabela…"
+          style={{
+            marginBottom: 8,
+            padding: "6px 10px",
+            fontSize: 12.5,
+            width: "100%",
+            maxWidth: 280,
+            background: "var(--card)",
+            color: "var(--foreground)",
+            border: "1px solid var(--border-strong)",
+            borderRadius: "var(--radius)",
+          }}
+        />
+      )}
+      <div style={{ overflowX: "auto" }}>
+        <table className="dt">
+          <thead>
+            <tr>
               {cols.map((c) => (
-                <td key={c.key} className={c.num ? "num" : undefined}>
-                  {c.render(r, i)}
-                </td>
+                <th
+                  key={c.key}
+                  onClick={() => toggleSort(c)}
+                  style={c.sort ? { cursor: "pointer", userSelect: "none" } : undefined}
+                  title={c.sort ? "Ordenar" : undefined}
+                >
+                  {c.label}
+                  {c.sort && (
+                    <span style={{ marginLeft: 4, opacity: sort?.key === c.key ? 1 : 0.3 }}>
+                      {sort?.key === c.key ? (sort.dir === 1 ? "▲" : "▼") : "▲"}
+                    </span>
+                  )}
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {pageRows.map((r, i) => (
+              <tr key={clampedPage * pageSize + i}>
+                {cols.map((c) => (
+                  <td key={c.key} className={c.num ? "num" : undefined}>
+                    {c.render(r, clampedPage * pageSize + i)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {sorted.length > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 10, fontSize: 12, color: "var(--muted-foreground)" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            Por página
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setPage(0);
+              }}
+              style={{
+                padding: "3px 6px",
+                fontSize: 12,
+                background: "var(--card)",
+                color: "var(--foreground)",
+                border: "1px solid var(--border-strong)",
+                borderRadius: "var(--radius)",
+              }}
+            >
+              {PAGE_SIZE_OPTIONS.map((n) => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+            </select>
+          </label>
+          {pageCount > 1 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" }}>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                disabled={clampedPage === 0}
+                style={pagerBtnStyle}
+              >
+                ‹
+              </button>
+              <span className="mono">{clampedPage + 1} de {pageCount}</span>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+                disabled={clampedPage >= pageCount - 1}
+                style={pagerBtnStyle}
+              >
+                ›
+              </button>
+            </div>
+          )}
+          <span className="mono" style={{ marginLeft: pageCount > 1 ? 0 : "auto" }}>{sorted.length} linhas</span>
+        </div>
+      )}
     </div>
   );
 }
+
+const pagerBtnStyle: CSSProperties = {
+  padding: "3px 9px",
+  fontSize: 13,
+  background: "transparent",
+  color: "var(--foreground)",
+  border: "1px solid var(--border-strong)",
+  borderRadius: "var(--radius)",
+  cursor: "pointer",
+};
 
 /** Aviso inline (nunca bloqueia a tela) — borda esquerda + ícone, nunca só cor (WCAG 1.4.1). */
 export function WarningCallout({ tone = "warn", children }: { tone?: "warn" | "neutral"; children: ReactNode }) {

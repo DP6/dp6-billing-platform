@@ -1,7 +1,7 @@
 import { HBars } from "../charts/HBars";
 import { PercentLines } from "../charts/PercentLines";
 import { RingStat } from "../charts/RingStat";
-import { DataTable, LoadingOrError, MetricTile, PageHeader, Panel, StatusBadge, WarningCallout } from "../components/ui";
+import { Chip, DataTable, LoadingOrError, MetricTile, PageHeader, Panel, StatusBadge } from "../components/ui";
 import { useApi } from "../lib/api";
 import { brl, pctPlain, monthLabel as ymLabel } from "../lib/format";
 import { scopeParams, useFilters } from "../lib/useFilters";
@@ -48,12 +48,10 @@ export function Alocacao() {
         desc="Cobertura de label, custo alocado por app/ambiente, prontidão de chargeback."
       />
 
-      <WarningCallout>
-        Cobertura de label ainda é baixa. O rateio abaixo cobre só a fração já rotulada — não
-        use para chargeback ainda.
-      </WarningCallout>
-
-      <Panel title="Cobertura de label · por custo" cap={cov ? `${ymLabel(cov.invoice_month)} · sobre ${brl(cov.net_cost_total_brl)} de custo líquido.` : undefined}>
+      <Panel
+        title="Cobertura de label · por custo"
+        cap={`Cada anel = fração do custo líquido do mês com aquela chave de label preenchida (não é sobre volume de recursos).${cov ? ` ${ymLabel(cov.invoice_month)} · ${brl(cov.net_cost_total_brl)} de custo líquido no mês.` : ""}`}
+      >
         <LoadingOrError loading={coverage.loading} error={coverage.error} />
         {cov && (
           <div style={{ display: "flex", gap: 32, flexWrap: "wrap", justifyContent: "space-around" }}>
@@ -88,21 +86,27 @@ export function Alocacao() {
         />
       )}
 
-      <Panel title="Prontidão de chargeback" cap="Critérios para usar o rateio como cobrança real.">
+      <Panel title="Prontidão de chargeback" cap="Critérios pra saber se dá pra usar o rateio como cobrança real, não só como referência interna.">
         <LoadingOrError loading={chargeback.loading} error={chargeback.error} />
         {chargeback.data && (
           <>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
               <span className="mono" style={{ fontSize: 20, fontWeight: 700 }}>{pctPlain(chargeback.data.coverage_pct)}</span>
               <StatusBadge tone={chargeback.data.ready ? "ok" : "error"}>{chargeback.data.ready ? "pronto" : "não pronto"}</StatusBadge>
+              <Chip tone="ok">calculado ao vivo</Chip>
             </div>
             <DataTable
               rows={chargeback.data.criteria}
               cols={[
                 { key: "l", label: "Critério", render: (c) => c.label },
                 { key: "s", label: "Status", render: (c) => <StatusBadge tone={statusTone[c.status as keyof typeof statusTone]}>{c.status}</StatusBadge> },
+                { key: "src", label: "", render: () => <Chip tone="warn">curado</Chip> },
               ]}
             />
+            <p style={{ margin: "8px 0 0", fontSize: 12, color: "var(--ink-dim)" }}>
+              Só o % e o badge acima são calculados a partir do dado real; os 4 critérios da
+              lista são um checklist mantido à mão, não recalculado automaticamente.
+            </p>
           </>
         )}
       </Panel>
