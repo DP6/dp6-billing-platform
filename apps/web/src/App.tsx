@@ -13,22 +13,20 @@ import {
 import { useTheme } from "./lib/useTheme";
 import { Alocacao } from "./screens/Alocacao";
 import { Anomalias } from "./screens/Anomalias";
-import { Orcamento } from "./screens/Orcamento";
-import { Otimizacao } from "./screens/Otimizacao";
+import { Eficiencia } from "./screens/Eficiencia";
 import { Servicos } from "./screens/Servicos";
 import { Tendencia } from "./screens/Tendencia";
-import { UnitEconomicsScreen } from "./screens/UnitEconomics";
 import { VisaoGeral } from "./screens/VisaoGeral";
 import type { Dimensions, Meta } from "./types";
 
+// IA de 6 abas (specs/005-telas.md §0, era 8 — ver docs/adr/ADR-009-ia-6-abas.md):
+// Orçamento fundiu em Visão Geral; Otimização + Unit economics fundiram em Eficiência.
 const TABS = [
   ["/", "Visão geral", VisaoGeral],
-  ["/orcamento", "Orçamento", Orcamento],
   ["/tendencia", "Tendência", Tendencia],
-  ["/alocacao", "Alocação", Alocacao],
   ["/servicos", "Serviços & SKUs", Servicos],
-  ["/otimizacao", "Otimização", Otimizacao],
-  ["/unit-economics", "Unit economics", UnitEconomicsScreen],
+  ["/alocacao", "Alocação", Alocacao],
+  ["/eficiencia", "Eficiência & economia", Eficiencia],
   ["/anomalias", "Anomalias", Anomalias],
 ] as const;
 
