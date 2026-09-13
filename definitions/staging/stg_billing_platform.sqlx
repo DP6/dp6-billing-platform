@@ -100,6 +100,33 @@ SELECT
   -- labels achatadas (environment, app, managed-by) -> label_environment, label_app, label_managed_by
   ${c.labelColumns("d")},
 
+  -- label_app/label_environment reconciliados: usam o label nativo quando existe, senao
+  -- tentam reconstruir dono/ambiente pelo nome do recurso (Cloud Run, Secret Manager,
+  -- escopados por project_id) ou pelo padrao de job_id (BigQuery) -- ver docs/adr da
+  -- reconciliacao. label_app/label_environment brutos acima NAO mudam (continuam refletindo
+  -- so o label real, usados por rpt_label_coverage*/chargeback_readiness); so
+  -- allocation/by-app e /by-env usam estas.
+  CASE
+    WHEN (SELECT value FROM UNNEST(d.labels) WHERE key = 'app') IS NOT NULL
+      THEN (SELECT value FROM UNNEST(d.labels) WHERE key = 'app')
+    WHEN d.service.description = 'Cloud Run'
+      THEN ${c.cloudRunAppCase("d.resource.global_name", "d.project.id")}
+    WHEN d.service.description = 'Secret Manager'
+      THEN ${c.secretAppCase("d.resource.global_name", "d.project.id")}
+    WHEN d.service.description = 'BigQuery'
+      THEN ${c.bigQueryAppCase("d.resource.global_name")}
+    ELSE NULL
+  END AS label_app_reconciled,
+  CASE
+    WHEN (SELECT value FROM UNNEST(d.labels) WHERE key = 'environment') IS NOT NULL
+      THEN (SELECT value FROM UNNEST(d.labels) WHERE key = 'environment')
+    WHEN d.service.description = 'Cloud Run'
+      THEN ${c.cloudRunEnvCase("d.resource.global_name")}
+    WHEN d.service.description = 'Secret Manager'
+      THEN ${c.secretEnvCase("d.resource.global_name")}
+    ELSE NULL
+  END AS label_environment_reconciled,
+
   export_time,
   source_row_fp
 FROM deduped AS d

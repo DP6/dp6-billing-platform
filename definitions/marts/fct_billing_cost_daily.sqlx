@@ -2,7 +2,7 @@ config {
   type: "incremental",
   schema: dataform.projectConfig.vars.mart_dataset,
   tags: ["billing_platform"],
-  description: "Fato diario de custo. Grao: invoice_month x usage_date x project x service x sku x pricing_unit x location x cost_type x label_environment x label_app x label_managed_by. `project_id`/`project_name` adicionados em relacao ao polaris-cost-model (que so cobria 1 projeto) — ver docs/adr/.",
+  description: "Fato diario de custo. Grao: invoice_month x usage_date x project x service x sku x pricing_unit x location x cost_type x label_environment x label_app x label_managed_by x label_environment_reconciled x label_app_reconciled. `project_id`/`project_name` adicionados em relacao ao polaris-cost-model (que so cobria 1 projeto) — ver docs/adr/.",
   // uniqueKey aponta pro grain_key sintetico (ver SELECT), nao pras colunas de grao cruas.
   // Motivo: sem uniqueKey, updatePartitionFilter nao substitui a particao -- cada run
   // incremental duplicava as SUMs do grao dentro do lookback (incidente 2026-09-11, herdado
@@ -35,11 +35,14 @@ SELECT
   label_environment,
   label_app,
   label_managed_by,
+  label_environment_reconciled,
+  label_app_reconciled,
 
   TO_HEX(MD5(CONCAT(
     invoice_month, '|', CAST(usage_date AS STRING), '|', IFNULL(project_id, ''), '|', service_description, '|',
     IFNULL(sku_description, ''), '|', IFNULL(pricing_unit, ''), '|', IFNULL(location_location, ''), '|',
-    cost_type, '|', IFNULL(label_environment, ''), '|', IFNULL(label_app, ''), '|', IFNULL(label_managed_by, '')
+    cost_type, '|', IFNULL(label_environment, ''), '|', IFNULL(label_app, ''), '|', IFNULL(label_managed_by, ''), '|',
+    IFNULL(label_environment_reconciled, ''), '|', IFNULL(label_app_reconciled, '')
   ))) AS grain_key,
 
   SUM(gross_cost_brl)                 AS gross_cost_brl,
@@ -55,4 +58,5 @@ FROM ${ref("stg_billing_platform")}
 ${when(incremental(), `WHERE ${c.lookbackFilter("usage_date")}`)}
 GROUP BY
   invoice_month, invoice_month_date, usage_date, project_id, service_description, sku_description,
-  pricing_unit, location_location, cost_type, label_environment, label_app, label_managed_by
+  pricing_unit, location_location, cost_type, label_environment, label_app, label_managed_by,
+  label_environment_reconciled, label_app_reconciled
