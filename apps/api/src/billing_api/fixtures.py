@@ -111,6 +111,7 @@ ALLOC_BY_APP = {
     ],
     "unallocated_net_cost_brl": 23.78,
     "unallocated_pct": 0.90,
+    "net_cost_total_brl": 26.41,
 }
 
 ALLOC_BY_ENV = [

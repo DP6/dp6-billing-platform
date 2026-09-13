@@ -115,6 +115,7 @@ export interface AppAllocation {
   rows: { label_app: string; net_cost_brl: number }[];
   unallocated_net_cost_brl: number;
   unallocated_pct: number;
+  net_cost_total_brl: number;
 }
 export interface EnvCost {
   label_environment: string;
@@ -124,6 +125,7 @@ export interface EnvAllocation {
   rows: EnvCost[];
   unallocated_net_cost_brl: number;
   unallocated_pct: number;
+  net_cost_total_brl: number;
 }
 export interface ChargebackReadiness {
   coverage_pct: number;
