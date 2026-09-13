@@ -58,12 +58,15 @@
   --text-title: 20px;
   --text-display: 28px;
 
-  /* paleta de gráfico (reconciliada aos acentos; validada dataviz) */
-  --chart-net: var(--accent-blue);
-  --chart-alt: var(--accent-green);
-  --chart-other: #8a8f96;
+  /* paleta de gráfico — hex própria, desacoplada de --accent-* (esses continuam usados em
+     UI não-gráfico como os links). Validada com scripts/validate_palette.js (skill dataviz):
+     lightness band, CVD e ΔE normal-vision todos PASS; --chart-other falha "chroma floor" de
+     propósito (é o neutro "Outros", não deveria ler como uma cor categórica). */
+  --chart-net: #2166ac;
+  --chart-alt: #0f9d58;
+  --chart-other: #6e747c;
   --chart-alert: var(--status-error);
-  --chart-credit: var(--accent-purple);
+  --chart-credit: #6b46c1;
 
   /* --- aliases legados (não usar em código novo) --- */
   --bg: var(--background);
@@ -120,11 +123,12 @@
   --accent-green: #34d399;
   --accent-orange: #fb923c;
 
-  --chart-net: var(--accent-blue);
-  --chart-alt: var(--accent-green);
-  --chart-other: #6b7078;
+  /* paleta de gráfico — hex própria, ver nota da versão clara acima. */
+  --chart-net: #3a82c4;
+  --chart-alt: #0f8055;
+  --chart-other: #8b9198;
   --chart-alert: var(--status-error-foreground);
-  --chart-credit: var(--accent-purple);
+  --chart-credit: #9d72d4;
 
   --ink-mute: #7c8188;
   --focus: rgba(255, 179, 2, 0.5);

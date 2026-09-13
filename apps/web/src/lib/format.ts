@@ -14,6 +14,14 @@ export const brl = (v: number | null | undefined) => (v == null ? "—" : brlFmt
 /** US$ com 6 casas quando |v| < 0,01 (custo subcentavo), senao 2. */
 export const usd = (v: number | null | undefined) =>
   v == null ? "—" : Math.abs(v) < 0.01 && v !== 0 ? usd6Fmt.format(v) : usdFmt.format(v);
+/** BRL com até 7 casas quando |v| < 0,01 (custo subcentavo — ex. R$/req), senão 2 como `brl()`.
+ *  `brl()` sozinho arredonda esses valores pra "R$ 0,00" e some com o número de verdade. */
+export const brlPrecise = (v: number | null | undefined) =>
+  v == null
+    ? "—"
+    : Math.abs(v) < 0.01 && v !== 0
+      ? `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 7 })}`
+      : brlFmt.format(v);
 
 export const pct = (v: number | null | undefined, digits = 1) =>
   v == null

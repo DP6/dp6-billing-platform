@@ -6,6 +6,12 @@ Fase 2 (`validation/RESULTADOS.md`). Entrega = **app standalone** (`apps/api` Fa
 
 Cadeia: **widget** → **endpoint / DTO** → **view `rpt_*`** → **mart** → **`stg_billing_platform`** → **coluna da `billing_export_resource`**.
 
+> **Nota 2026-09-12** (`docs/adr/ADR-009-ia-6-abas.md`): a IA passou de 8 para 6 abas
+> (`specs/005-telas.md` §0) — Orçamento fundiu em Visão Geral, Otimização + Unit economics
+> fundiram em Eficiência & economia. As seções abaixo continuam como registro histórico das
+> fases em que foram escritas; para a lista atual de rotas/params, ver
+> `apps/api/src/billing_api/routes.py`.
+
 ---
 
 ## 1. Filtros globais → WHERE
