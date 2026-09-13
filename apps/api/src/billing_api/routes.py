@@ -505,6 +505,12 @@ def alloc_coverage_weekly(
         FROM `{RPT}.rpt_label_coverage_weekly` WHERE TRUE {where}
         GROUP BY week_start ORDER BY week_start
     """, params)
+    # SAFE_DIVIDE por SUM(net_cost_week_brl) vira NULL numa semana com custo líquido somando
+    # 0 — CoverageWeekDTO exige float, não Optional; 0.0 é a leitura certa (sem custo na
+    # semana, cobertura sem sentido, mas não pode quebrar o Pydantic).
+    for r in rows:
+        for k in ("pct_app", "pct_environment", "pct_managed_by"):
+            r[k] = r.get(k) or 0.0
     return [m.CoverageWeekDTO(**r) for r in rows]
 
 
@@ -519,13 +525,20 @@ def alloc_by_app(
     if project:
         where, params = " AND project_id = @project", {"project": project}
     rows = query(f"""
-        SELECT label_app, SUM(net_cost_brl) net_cost_brl,
-               ANY_VALUE(unallocated_net_cost_brl) un, ANY_VALUE(net_cost_total_brl) tot
+        SELECT label_app, SUM(net_cost_brl) net_cost_brl
         FROM `{RPT}.rpt_showback_monthly` WHERE label_app != '(sem label)' {where}
         GROUP BY label_app ORDER BY net_cost_brl DESC
     """, params)
-    un = rows[0]["un"] if rows else 0.0
-    tot = rows[0]["tot"] if rows else 1.0
+    # ANY_VALUE sobre o conjunto SEM o filtro de label (mas COM o filtro de projeto) — un/tot
+    # são constantes por linha na view, mas se nenhuma linha tiver label (bug real: com 0 apps
+    # rotulados `rows` acima vem vazio e um fallback aqui teria que "inventar" un=0, que é o
+    # oposto da realidade — quando nada tem label, o não-alocado é ~100%, não 0%).
+    totals = query(f"""
+        SELECT ANY_VALUE(unallocated_net_cost_brl) un, ANY_VALUE(net_cost_total_brl) tot
+        FROM `{RPT}.rpt_showback_monthly` WHERE TRUE {where}
+    """, params)
+    un = totals[0]["un"] if totals and totals[0]["un"] is not None else 0.0
+    tot = totals[0]["tot"] if totals and totals[0]["tot"] else 1.0
     return m.AppAllocationDTO(
         rows=[m.AppRowDTO(label_app=r["label_app"], net_cost_brl=r["net_cost_brl"]) for r in rows],
         unallocated_net_cost_brl=un, unallocated_pct=(un / tot if tot else 0.0),
@@ -546,13 +559,18 @@ def alloc_by_env(
     if project:
         where, params = " AND project_id = @project", {"project": project}
     rows_raw = query(f"""
-        SELECT label_environment, SUM(net_cost_brl) net_cost_brl,
-               ANY_VALUE(unallocated_net_cost_brl) un, ANY_VALUE(net_cost_total_brl) tot
+        SELECT label_environment, SUM(net_cost_brl) net_cost_brl
         FROM `{RPT}.rpt_showback_monthly` WHERE label_environment != '(sem label)' {where}
         GROUP BY label_environment ORDER BY net_cost_brl DESC
     """, params)
-    un = rows_raw[0]["un"] if rows_raw else 0.0
-    tot = rows_raw[0]["tot"] if rows_raw else 1.0
+    # ver comentário equivalente em alloc_by_app — un/tot vêm de um SELECT sem o filtro de
+    # label, pra não inverter a leitura quando não há nenhum ambiente rotulado.
+    totals = query(f"""
+        SELECT ANY_VALUE(unallocated_net_cost_brl) un, ANY_VALUE(net_cost_total_brl) tot
+        FROM `{RPT}.rpt_showback_monthly` WHERE TRUE {where}
+    """, params)
+    un = totals[0]["un"] if totals and totals[0]["un"] is not None else 0.0
+    tot = totals[0]["tot"] if totals and totals[0]["tot"] else 1.0
     return m.EnvAllocationDTO(
         rows=[m.EnvCostDTO(label_environment=r["label_environment"], net_cost_brl=r["net_cost_brl"]) for r in rows_raw],
         unallocated_net_cost_brl=un,
@@ -644,7 +662,11 @@ def unit_economics() -> m.UnitEconomicsDTO:
     if mock_active():
         return m.UnitEconomicsDTO(**fx.UNIT_ECON)
     r = query(f"SELECT * FROM `{RPT}.rpt_unit_economics`")[0]
-    r["cost_per_gib_log_brl"] = r.get("cost_per_gib_log_brl") or 0.0
+    # SAFE_DIVIDE(x, NULLIF(units, 0)) na view vira NULL sem uso de CPU/memória/log/request
+    # nos últimos 30 dias — UnitEconomicsDTO exige os 3 campos, não Optional.
+    for k in ("cost_per_gib_log_brl", "cost_per_vcpu_s_brl", "cost_per_gib_s_brl"):
+        r[k] = r.get(k) or 0.0
+    r["cpu_mem_ratio"] = r.get("cpu_mem_ratio") or "—"
     return m.UnitEconomicsDTO(**r)
 
 
@@ -667,10 +689,14 @@ def unit_economics_series(
 
 @router.get("/efficiency/waterfall", response_model=list[m.WaterfallStepDTO])
 def efficiency_waterfall(period: str | None = None) -> list[m.WaterfallStepDTO]:
+    """Devolve os degraus (start/decrease/end) + a linha meta '_cost_avoided_brl' (desconto
+    negociado + créditos, já calculada em rpt_savings_waterfall) — só '_effective_savings_pct'
+    fica de fora. O front usa '_cost_avoided_brl' pro card "Custo evitado" e descarta o resto
+    de kind=meta antes de desenhar o waterfall (ver Waterfall.tsx/shape())."""
     if mock_active():
         return [m.WaterfallStepDTO(**s) for s in fx.WATERFALL]
     rows = query(f"SELECT step label, kind, value_brl FROM `{RPT}.rpt_savings_waterfall` "
-                 f"WHERE kind != 'meta' ORDER BY ord")
+                 f"WHERE kind != 'meta' OR step = '_cost_avoided_brl' ORDER BY ord")
     return [m.WaterfallStepDTO(label=r["label"], value_brl=r["value_brl"], kind=r["kind"]) for r in rows]
 
 

@@ -179,7 +179,8 @@ export interface UnitSeriesPoint {
 export interface WaterfallStep {
   label: string;
   value_brl: number;
-  kind: "start" | "decrease" | "end";
+  /** "meta" = linha auxiliar (ex. `_cost_avoided_brl`) — não é um degrau do waterfall. */
+  kind: "start" | "decrease" | "end" | "meta";
 }
 export interface AnomalyRow {
   usage_date: string;

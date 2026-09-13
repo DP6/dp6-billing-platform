@@ -160,4 +160,6 @@ WATERFALL = [
     {"label": "negotiated_discount", "value_brl": 0.0, "kind": "decrease"},
     {"label": "credits", "value_brl": -0.57, "kind": "decrease"},
     {"label": "net_cost", "value_brl": 25.84, "kind": "end"},
+    # meta: desconto negociado + créditos (espelha rpt_savings_waterfall._cost_avoided_brl)
+    {"label": "_cost_avoided_brl", "value_brl": 0.0 + 0.57, "kind": "meta"},
 ]

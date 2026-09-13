@@ -5,7 +5,9 @@ import { axisStyle, chartColor } from "./palette";
 export interface WaterfallStep {
   label: string;
   value_brl: number;
-  kind: "start" | "decrease" | "end";
+  /** "meta" nunca deveria chegar aqui — filtrar antes de passar pro componente (shape() não
+   *  sabe desenhar essa linha); aceito no tipo só pra bater com o DTO da API. */
+  kind: "start" | "decrease" | "end" | "meta";
 }
 
 interface Row {
