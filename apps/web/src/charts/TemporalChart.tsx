@@ -86,8 +86,12 @@ function shape(data: CostSeriesPoint[], grain: Grain): { rows: Row[]; keys: stri
   return { rows, keys };
 }
 
-const barColor = (i: number) =>
-  i === 0 ? chartColor("net") : i === 1 ? chartColor("alt") : chartColor("other");
+// "Outros" (cauda agregada por shape()) sempre em cinza; as demais séries ciclam pela
+// paleta categórica de 4 cores (net/alt/alert/credit) — antes disso, da 3ª série em
+// diante todas caíam em chartColor("other") e ficavam indistinguíveis no stack.
+const SERIES_ORDER = ["net", "alt", "alert", "credit", "other"] as const;
+const barColor = (i: number, key: string) =>
+  key === "Outros" ? chartColor("other") : chartColor(SERIES_ORDER[i % SERIES_ORDER.length]);
 
 export function TemporalChart({
   data,
@@ -95,65 +99,71 @@ export function TemporalChart({
   groupBy,
   onChange,
   height = 260,
+  controls = true,
 }: {
   data: CostSeriesPoint[] | undefined;
   grain: Grain;
   groupBy: GroupBy;
   onChange: (p: { grain: Grain; groupBy: GroupBy }) => void;
   height?: number;
+  /** false esconde os seletores de Granularidade/Empilhar por — usado quando a tela já
+   *  fixa grain+groupBy (ex. Tendência: sempre mês/serviço, sem controle do usuário). */
+  controls?: boolean;
 }) {
   const { rows, keys } = data ? shape(data, grain) : { rows: [], keys: [] };
   const single = keys.length === 1 && keys[0] === "total";
 
   return (
     <div>
-      <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
-        <label style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-          <span
-            style={{
-              font: "500 10px/1 Ubuntu",
-              letterSpacing: ".16em",
-              textTransform: "uppercase",
-              color: "var(--muted-foreground)",
-            }}
-          >
-            Granularidade
-          </span>
-          <select
-            value={grain}
-            onChange={(e) => onChange({ grain: e.target.value as Grain, groupBy })}
-            style={selectCss}
-          >
-            <option value="day">Dia</option>
-            <option value="month">Mês</option>
-          </select>
-        </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-          <span
-            style={{
-              font: "500 10px/1 Ubuntu",
-              letterSpacing: ".16em",
-              textTransform: "uppercase",
-              color: "var(--muted-foreground)",
-            }}
-          >
-            Empilhar por
-          </span>
-          <select
-            value={groupBy}
-            onChange={(e) => onChange({ grain, groupBy: e.target.value as GroupBy })}
-            style={selectCss}
-          >
-            {(Object.keys(GROUP_LABEL) as GroupBy[]).map((g) => (
-              <option key={g} value={g}>
-                {GROUP_LABEL[g]}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+      {controls && (
+        <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
+          <label style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+            <span
+              style={{
+                font: "500 10px/1 Ubuntu",
+                letterSpacing: ".16em",
+                textTransform: "uppercase",
+                color: "var(--muted-foreground)",
+              }}
+            >
+              Granularidade
+            </span>
+            <select
+              value={grain}
+              onChange={(e) => onChange({ grain: e.target.value as Grain, groupBy })}
+              style={selectCss}
+            >
+              <option value="day">Dia</option>
+              <option value="month">Mês</option>
+            </select>
+          </label>
+          <label style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+            <span
+              style={{
+                font: "500 10px/1 Ubuntu",
+                letterSpacing: ".16em",
+                textTransform: "uppercase",
+                color: "var(--muted-foreground)",
+              }}
+            >
+              Empilhar por
+            </span>
+            <select
+              value={groupBy}
+              onChange={(e) => onChange({ grain, groupBy: e.target.value as GroupBy })}
+              style={selectCss}
+            >
+              {(Object.keys(GROUP_LABEL) as GroupBy[]).map((g) => (
+                <option key={g} value={g}>
+                  {GROUP_LABEL[g]}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
 
-      <div className="chart-well" style={{ marginTop: 10 }}>
+      <div className="chart-well" style={{ marginTop: controls ? 10 : 0 }}>
         <ResponsiveContainer width="100%" height={height}>
           <ComposedChart data={rows} margin={{ top: 8, right: 46, bottom: 4, left: 0 }}>
             <CartesianGrid stroke="var(--hair-strong)" vertical={false} />
@@ -205,7 +215,9 @@ export function TemporalChart({
                 dataKey={k}
                 stackId="s"
                 name={single ? "líquido" : k}
-                fill={barColor(i)}
+                fill={barColor(i, k)}
+                stroke="var(--card)"
+                strokeWidth={2}
                 maxBarSize={34}
               />
             ))}
