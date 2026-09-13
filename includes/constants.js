@@ -47,10 +47,99 @@ function lookbackFilter(dateCol) {
   return dateCol + " >= DATE_SUB(CURRENT_DATE('" + TIMEZONE + "'), INTERVAL " + LOOKBACK_DAYS + " DAY)";
 }
 
+// --- reconciliação de custo não-alocado por nome de recurso (plano "conciliar Cloud Run +
+// Secret Manager + BigQuery com label", ver docs/adr). Mesmo mecanismo do polaris-cost-model,
+// mas escopado por project_id (conta inteira, N projetos) — hoje só sei preencher com certeza
+// os recursos de dp6-ci-polaris; outros projetos entram conforme forem confirmados. Cloud Run
+// "Services" CPU/Memory e a maioria dos secrets do Secret Manager quase nunca carregam labels
+// no billing export (limitação do GCP) — reconciliamos pelo nome do recurso, que sempre vem
+// preenchido em `resource.global_name`.
+const CLOUD_RUN_APP_MAP = [
+  { project_id: "dp6-ci-polaris", match: "name LIKE 'backend-%'", app: "atlas" },
+  { project_id: "dp6-ci-polaris", match: "name LIKE 'frontend-%'", app: "atlas" },
+  { project_id: "dp6-ci-polaris", match: "name LIKE 'billing-platform-api-%'", app: "dp6-billing-platform" },
+  { project_id: "dp6-ci-polaris", match: "name LIKE 'billing-web-%'", app: "polaris-cost-model" },
+  { project_id: "dp6-ci-polaris", match: "name LIKE 'billing-api-%'", app: "polaris-cost-model" },
+  { project_id: "dp6-ci-polaris", match: "name = 'polaris'", app: "polaris" },
+];
+const SECRET_APP_MAP = [
+  { project_id: "dp6-ci-polaris", match: "name LIKE 'GOOGLE_OAUTH_CLIENT_SECRET_%'", app: "atlas" },
+  { project_id: "dp6-ci-polaris", match: "name LIKE 'GOOGLE_OAUTH_CLIENT_ID_%'", app: "atlas" },
+  { project_id: "dp6-ci-polaris", match: "name LIKE 'JWT_SECRET_%'", app: "atlas" },
+  { project_id: "dp6-ci-polaris", match: "name = 'OAUTH_ALLOWLIST'", app: "atlas" },
+  { project_id: "dp6-ci-polaris", match: "name = 'polaris-cost-model-dataform-git-token'", app: "polaris-cost-model" },
+  { project_id: "dp6-ci-polaris", match: "name = 'dp6-billing-platform-dataform-git-token'", app: "dp6-billing-platform" },
+  { project_id: "dp6-ci-polaris", match: "name LIKE 'polaris-%'", app: "polaris" },
+];
+
+function resourceNameAfter(expr, segment) {
+  return "REGEXP_EXTRACT(" + expr + ", r'/" + segment + "/([^/]+)$')";
+}
+function appCaseFromMap(nameExpr, projectExpr, map) {
+  // replacer como funcao, nao string: nameExpr tem REGEXP_EXTRACT(...([^/]+)$') -- o "$'" no
+  // fim e um padrao especial de substituicao do String.replace ("texto apos o match") quando
+  // a substituicao e uma string; com funcao o retorno e usado ao pe da letra.
+  const whens = map
+    .map(
+      ({ project_id, match, app }) =>
+        "WHEN " + projectExpr + " = '" + project_id + "' AND " + match.replace(/\bname\b/g, () => nameExpr) + " THEN '" + app + "'"
+    )
+    .join("\n    ");
+  return "CASE\n    " + whens + "\n    ELSE NULL\n  END";
+}
+function cloudRunAppCase(expr, projectExpr) {
+  return appCaseFromMap(resourceNameAfter(expr, "(?:services|jobs)"), projectExpr, CLOUD_RUN_APP_MAP);
+}
+function cloudRunEnvCase(expr) {
+  const name = resourceNameAfter(expr, "(?:services|jobs)");
+  return (
+    "CASE\n" +
+    "    WHEN " + name + " LIKE '%-dev%' THEN 'dev'\n" +
+    "    WHEN " + name + " LIKE '%-prod%' THEN 'prod'\n" +
+    "    WHEN " + name + " = 'polaris' THEN 'prod'\n" +
+    "    ELSE NULL\n" +
+    "  END"
+  );
+}
+function secretAppCase(expr, projectExpr) {
+  return appCaseFromMap(resourceNameAfter(expr, "secrets"), projectExpr, SECRET_APP_MAP);
+}
+function secretEnvCase(expr) {
+  const name = resourceNameAfter(expr, "secrets");
+  return (
+    "CASE\n" +
+    "    WHEN " + name + " LIKE '%_DEV' OR " + name + " LIKE '%-dev%' THEN 'dev'\n" +
+    "    WHEN " + name + " LIKE '%_PROD' OR " + name + " LIKE '%-prod%' THEN 'prod'\n" +
+    "    ELSE NULL\n" +
+    "  END"
+  );
+}
+// BigQuery: sem resource.global_name utilizavel alem do Job ID, e sem project_id na regra —
+// o padrao de nome de job do Dataform (script_job_<hash>_<n>) vale igual em qualquer projeto.
+// Demais jobs (UUID solto) sao majoritariamente o proprio backend deste painel
+// (apps/api/src/billing_api/bq.py) rodando queries ao vivo — uma vez que bq.py passar a setar
+// label de job (roadmap), essas linhas caem no WHEN de label nativo antes de chegar aqui.
+function bigQueryJobId(expr) {
+  return "REGEXP_EXTRACT(" + expr + ", r'/jobs/([^/]+)$')";
+}
+function bigQueryAppCase(expr) {
+  const jobId = bigQueryJobId(expr);
+  return (
+    "CASE\n" +
+    "    WHEN REGEXP_CONTAINS(" + jobId + ", r'^script_job_') THEN '(BigQuery · pipeline Dataform)'\n" +
+    "    WHEN " + jobId + " IS NOT NULL THEN '(BigQuery · outras queries)'\n" +
+    "    ELSE NULL\n" +
+    "  END"
+  );
+}
+
 module.exports = {
   LOOKBACK_DAYS, FRESHNESS_HOURS, TIMEZONE, LABEL_KEYS,
   ANOMALY_Z, ANOMALY_MIN_BRL, MONTHLY_BUDGET_BRL, BUDGET_THRESHOLDS,
   CUD_REEVAL_THRESHOLD_BRL, DEPLOY_COUNT_PER_MONTH,
   STG, MART, RPT,
   sourceRef, labelCol, labelColumns, lookbackFilter,
+  CLOUD_RUN_APP_MAP, SECRET_APP_MAP,
+  resourceNameAfter, appCaseFromMap, cloudRunAppCase, cloudRunEnvCase,
+  secretAppCase, secretEnvCase, bigQueryAppCase,
 };

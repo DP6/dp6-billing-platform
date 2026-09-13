@@ -124,8 +124,7 @@ CHARGEBACK = {
     "ready": False,
     "criteria": [
         {"key": "labels_in_terraform", "label": "Labels padrão via default_labels", "status": "ok"},
-        {"key": "coverage_ge_95", "label": "Cobertura ≥ 95% do custo", "status": "missing"},
-        {"key": "owner_per_app", "label": "Dono definido por app", "status": "missing"},
+        {"key": "coverage_ge_80", "label": "Cobertura ≥ 80% do custo", "status": "missing"},
         {"key": "manual_resources", "label": "Recursos manuais (secrets) rotulados", "status": "partial"},
     ],
 }
