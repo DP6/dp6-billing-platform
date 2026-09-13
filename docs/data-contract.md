@@ -198,7 +198,7 @@ A IA subiu de 4 para 8 abas (`specs/002` "Revisão pós-canvas"). Orçamento = *
 | Progressão semanal | `GET /api/allocation/coverage/weekly?from&to` → `CoverageWeekDTO[]` | `rpt_label_coverage_weekly` | `week_start`, `pct_app`, `pct_environment`, `pct_managed_by` |
 | Custo por app + não-alocado | `GET /api/allocation/by-app?from&to&currency` → `AppCostDTO[]` | `rpt_showback_monthly` | `label_app`, `net_cost_brl`, `unallocated_net_cost_brl`, `unallocated_pct` |
 | Custo por ambiente | `GET /api/allocation/by-env?from&to&currency` → `EnvCostDTO[]` | `rpt_showback_monthly` | `label_environment`, `net_cost_brl` |
-| Prontidão de chargeback | `GET /api/allocation/chargeback-readiness` → `ChargebackReadinessDTO` | `rpt_label_coverage` + **config estática** | `coverage_pct` (dado) + `criteria[]` (`labels_in_terraform`, `coverage_ge_95`, `owner_per_app` — config) |
+| Prontidão de chargeback | `GET /api/allocation/chargeback-readiness` → `ChargebackReadinessDTO` | `rpt_label_coverage` + **config estática** | `coverage_pct` (dado, `ready` se ≥ 80%) + `criteria[]` (`labels_in_terraform`, `coverage_ge_80`, `manual_resources` — config) |
 
 ### Aba 6 — Otimização & waste
 

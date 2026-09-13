@@ -116,7 +116,7 @@ export function Alocacao() {
         )}
       </Panel>
 
-      <Panel title="Alocado vs. não-alocado (por app)" cap={`No período filtrado · ${janela}.`}>
+      <Panel title="Alocado vs. não-alocado (por app)" cap={`No período filtrado · ${janela}. "Alocado" usa o label nativo quando existe e, quando não existe, reconstrói o dono pelo nome do recurso (Cloud Run, Secret Manager) ou pelo tipo de job (BigQuery) — por isso é maior que a Cobertura de label acima, de propósito.`}>
         <LoadingOrError loading={byApp.loading} error={byApp.error} />
         {byApp.data && <AllocSummary total={byApp.data.net_cost_total_brl} unallocated={byApp.data.unallocated_net_cost_brl} />}
       </Panel>
@@ -139,7 +139,7 @@ export function Alocacao() {
               ]}
             />
             <p style={{ margin: "8px 0 0", fontSize: 12, color: "var(--ink-dim)" }}>
-              Só o % e o badge acima são calculados a partir do dado real; os 4 critérios da
+              Só o % e o badge acima são calculados a partir do dado real; os 3 critérios da
               lista são um checklist mantido à mão, não recalculado automaticamente.
             </p>
           </>
@@ -147,13 +147,13 @@ export function Alocacao() {
       </Panel>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-        <Panel title="Custo alocado por app" cap={`Da fração com label app preenchida · ${janela}.`}>
+        <Panel title="Custo alocado por app" cap={`Label nativo + reconciliado por recurso/job · ${janela}. Barras "(BigQuery · ...)" são custo de BigQuery sem label nativo, classificado pelo tipo de job — não é uma app de verdade, mas também não é anônimo.`}>
           <LoadingOrError loading={byApp.loading} error={byApp.error} />
           {byApp.data && (
             <AllocBars title="por app" rows={byApp.data.rows.map((r) => ({ label: r.label_app, value: r.net_cost_brl }))} unallocated={byApp.data.unallocated_net_cost_brl} />
           )}
         </Panel>
-        <Panel title="Custo alocado por ambiente" cap={`Da fração com label environment preenchida · ${janela}.`}>
+        <Panel title="Custo alocado por ambiente" cap={`Label nativo + reconciliado (só Cloud Run/Secret Manager — BigQuery não dá pra inferir ambiente pelo job) · ${janela}.`}>
           <LoadingOrError loading={byEnv.loading} error={byEnv.error} />
           {byEnv.data && (
             <AllocBars title="por ambiente" rows={byEnv.data.rows.map((r) => ({ label: r.label_environment, value: r.net_cost_brl }))} unallocated={byEnv.data.unallocated_net_cost_brl} />
