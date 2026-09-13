@@ -529,12 +529,17 @@ def alloc_by_app(
         FROM `{RPT}.rpt_showback_monthly` WHERE label_app != '(sem label)' {where}
         GROUP BY label_app ORDER BY net_cost_brl DESC
     """, params)
-    # ANY_VALUE sobre o conjunto SEM o filtro de label (mas COM o filtro de projeto) — un/tot
-    # são constantes por linha na view, mas se nenhuma linha tiver label (bug real: com 0 apps
-    # rotulados `rows` acima vem vazio e um fallback aqui teria que "inventar" un=0, que é o
-    # oposto da realidade — quando nada tem label, o não-alocado é ~100%, não 0%).
+    # `rpt_showback_monthly` tem grão (invoice_month x project_id x label_app x
+    # label_environment) — sua coluna `unallocated_net_cost_brl` só é != 0 na linha onde app E
+    # ambiente estão AMBOS sem label ao mesmo tempo, e `net_cost_total_brl` é o total só do
+    # invoice_month daquela linha. Um ANY_VALUE solto sobre a tabela toda (1ª tentativa deste
+    # fix) pega um valor arbitrário de UM mês/linha específico, quase sempre 0 — por isso
+    # "não-alocado" continuava 0 mesmo com bug "corrigido". Calcular direto: não-alocado = soma
+    # de net_cost onde a própria label_app já vem '(sem label)' (a view já faz esse COALESCE).
     totals = query(f"""
-        SELECT ANY_VALUE(unallocated_net_cost_brl) un, ANY_VALUE(net_cost_total_brl) tot
+        SELECT
+          SUM(IF(label_app = '(sem label)', net_cost_brl, 0)) un,
+          SUM(net_cost_brl) tot
         FROM `{RPT}.rpt_showback_monthly` WHERE TRUE {where}
     """, params)
     un = totals[0]["un"] if totals and totals[0]["un"] is not None else 0.0
@@ -563,10 +568,14 @@ def alloc_by_env(
         FROM `{RPT}.rpt_showback_monthly` WHERE label_environment != '(sem label)' {where}
         GROUP BY label_environment ORDER BY net_cost_brl DESC
     """, params)
-    # ver comentário equivalente em alloc_by_app — un/tot vêm de um SELECT sem o filtro de
-    # label, pra não inverter a leitura quando não há nenhum ambiente rotulado.
+    # ver comentário equivalente em alloc_by_app — un/tot calculados direto (soma de net_cost
+    # onde label_environment já vem '(sem label)'), não lidos das colunas
+    # unallocated_net_cost_brl/net_cost_total_brl da view (grão por invoice_month x
+    # project_id, ANY_VALUE solto pega um valor arbitrário, quase sempre 0).
     totals = query(f"""
-        SELECT ANY_VALUE(unallocated_net_cost_brl) un, ANY_VALUE(net_cost_total_brl) tot
+        SELECT
+          SUM(IF(label_environment = '(sem label)', net_cost_brl, 0)) un,
+          SUM(net_cost_brl) tot
         FROM `{RPT}.rpt_showback_monthly` WHERE TRUE {where}
     """, params)
     un = totals[0]["un"] if totals and totals[0]["un"] is not None else 0.0
