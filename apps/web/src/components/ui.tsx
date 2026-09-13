@@ -227,6 +227,34 @@ export function DataTable<T>({
   );
 }
 
+/** Aviso inline (nunca bloqueia a tela) — borda esquerda + ícone, nunca só cor (WCAG 1.4.1). */
+export function WarningCallout({ tone = "warn", children }: { tone?: "warn" | "neutral"; children: ReactNode }) {
+  const accent = tone === "warn" ? "var(--warn)" : "var(--hair)";
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 10,
+        padding: "12px 16px",
+        background: "var(--well)",
+        border: "1px solid var(--hair)",
+        borderLeft: `2px solid ${accent}`,
+        borderRadius: "var(--radius)",
+        fontSize: 13,
+        color: "var(--ink-dim)",
+      }}
+    >
+      {tone === "warn" && (
+        <span aria-hidden="true" style={{ color: "var(--warn)", flex: "none" }}>
+          ▲
+        </span>
+      )}
+      <span>{children}</span>
+    </div>
+  );
+}
+
 export function LoadingOrError({ loading, error }: { loading?: boolean; error?: string }) {
   if (error) return <div style={{ color: "var(--bad)", fontSize: 13 }}>Erro ao carregar: {error}</div>;
   if (loading) return <div style={{ color: "var(--ink-mute)", fontSize: 13 }}>Carregando…</div>;
