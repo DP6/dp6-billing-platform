@@ -86,8 +86,12 @@ function shape(data: CostSeriesPoint[], grain: Grain): { rows: Row[]; keys: stri
   return { rows, keys };
 }
 
-const barColor = (i: number) =>
-  i === 0 ? chartColor("net") : i === 1 ? chartColor("alt") : chartColor("other");
+// "Outros" (cauda agregada por shape()) sempre em cinza; as demais séries ciclam pela
+// paleta categórica de 4 cores (net/alt/alert/credit) — antes disso, da 3ª série em
+// diante todas caíam em chartColor("other") e ficavam indistinguíveis no stack.
+const SERIES_ORDER = ["net", "alt", "alert", "credit", "other"] as const;
+const barColor = (i: number, key: string) =>
+  key === "Outros" ? chartColor("other") : chartColor(SERIES_ORDER[i % SERIES_ORDER.length]);
 
 export function TemporalChart({
   data,
@@ -211,7 +215,9 @@ export function TemporalChart({
                 dataKey={k}
                 stackId="s"
                 name={single ? "líquido" : k}
-                fill={barColor(i)}
+                fill={barColor(i, k)}
+                stroke="var(--card)"
+                strokeWidth={2}
                 maxBarSize={34}
               />
             ))}
