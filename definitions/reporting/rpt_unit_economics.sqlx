@@ -13,15 +13,24 @@ WITH w AS (
   WHERE usage_date >= DATE_SUB(CURRENT_DATE('${dataform.projectConfig.vars.timezone}'), INTERVAL 30 DAY)
 ),
 sku AS (
+  -- 'CPU Allocation Time'/'Memory Allocation Time' (nomes usados ate 2026-09-13) nunca
+  -- batiam com o billing export real do Cloud Run — os SKUs de verdade sao varios, por
+  -- modo de cobranca e regiao ("Services CPU (Instance-based billing) in us-central1",
+  -- "Services CPU (Request-based billing)", "Jobs CPU in us-central1", "...Tier 2...",
+  -- "...Min Instance...", idem pra Memory) — por isso cost_per_vcpu_s_brl/cost_per_gib_s_brl/
+  -- cpu_mem_ratio sempre vinham NULL com dado real, mesmo com uso de verdade no Cloud Run.
+  -- LIKE '%CPU%'/'%Memory%' (sempre 'second'/'gibibyte second' como unidade, confirmado
+  -- contra o export real) cobre todas as variantes; escopado a service_description='Cloud Run'
+  -- pra nao pegar CPU/Memory de outro servico.
   SELECT
-    SUM(IF(sku_description = 'Requests', net_cost_brl, 0))              AS req_cost_brl,
-    SUM(IF(sku_description = 'Requests', usage_amount_pricing_units, 0)) AS req_units,
+    SUM(IF(service_description = 'Cloud Run' AND sku_description = 'Requests', net_cost_brl, 0))              AS req_cost_brl,
+    SUM(IF(service_description = 'Cloud Run' AND sku_description = 'Requests', usage_amount_pricing_units, 0)) AS req_units,
     SUM(IF(sku_description LIKE '%Log Storage%' OR service_description = 'Cloud Logging', net_cost_brl, 0))              AS log_cost_brl,
     SUM(IF(sku_description LIKE '%Log Storage%' OR service_description = 'Cloud Logging', usage_amount_pricing_units, 0)) AS log_units,
-    SUM(IF(sku_description = 'CPU Allocation Time', net_cost_brl, 0))              AS cpu_cost_brl,
-    SUM(IF(sku_description = 'CPU Allocation Time', usage_amount_pricing_units, 0)) AS cpu_units,
-    SUM(IF(sku_description = 'Memory Allocation Time', net_cost_brl, 0))              AS mem_cost_brl,
-    SUM(IF(sku_description = 'Memory Allocation Time', usage_amount_pricing_units, 0)) AS mem_units,
+    SUM(IF(service_description = 'Cloud Run' AND sku_description LIKE '%CPU%', net_cost_brl, 0))              AS cpu_cost_brl,
+    SUM(IF(service_description = 'Cloud Run' AND sku_description LIKE '%CPU%', usage_amount_pricing_units, 0)) AS cpu_units,
+    SUM(IF(service_description = 'Cloud Run' AND sku_description LIKE '%Memory%', net_cost_brl, 0))              AS mem_cost_brl,
+    SUM(IF(service_description = 'Cloud Run' AND sku_description LIKE '%Memory%', usage_amount_pricing_units, 0)) AS mem_units,
     SUM(net_cost_brl) AS total_net_brl
   FROM w
 )
