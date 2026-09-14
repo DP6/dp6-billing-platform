@@ -199,6 +199,31 @@ export interface WaterfallStep {
   /** "meta" = linha auxiliar (ex. `_cost_avoided_brl`) — não é um degrau do waterfall. */
   kind: "start" | "decrease" | "end" | "meta";
 }
+export interface Me {
+  email: string;
+  is_admin: boolean;
+}
+export interface BudgetConfig {
+  scope: string; // project_id, ou "_account" (orçamento da conta inteira)
+  project_name: string | null;
+  budget_brl: number;
+  emails: string[];
+  updated_at: string | null;
+  updated_by: string | null;
+}
+export interface WeeklyReportConfig {
+  enabled: boolean;
+  updated_at: string | null;
+  updated_by: string | null;
+  last_run_at: string | null;
+  last_run_status: string | null;
+}
+export interface SendNowResult {
+  dry_run: boolean;
+  scopes_sent: string[];
+  scopes_failed: string[];
+  preview_html: string | null;
+}
 export interface AnomalyRow {
   usage_date: string;
   project_id: string;

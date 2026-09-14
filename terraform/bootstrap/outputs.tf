@@ -58,3 +58,33 @@ output "external_access_request" {
     (menos trabalho de TI, superficie de acesso maior). Pipeline nao-assistido, 1x/dia.
   EOT
 }
+
+# texto do pedido pra um Super Admin do Workspace (aba ADM — budget/e-mail + relatorio
+# semanal, ver plano "ADM tab"). Os e-mails de SA de runtime abaixo sao previsiveis
+# (nome-do-service-account@dp6-ci-polaris.iam.gserviceaccount.com, ver terraform/modules/
+# app_service/main.tf) mas so existem de verdade depois do 1o apply de environments/{dev,prod} —
+# conferir com `terraform output -raw ...` la antes de mandar, se quiser confirmar o Client ID.
+output "workspace_delegation_request" {
+  value = <<-EOT
+    Domain-wide delegation, concedida por um Super Admin do Workspace
+    (provavelmente admin.victoria@dp6.com.br ou TI) — Admin Console >
+    Security > API controls > Domain-wide delegation > Add new:
+
+    1) SA de runtime DEV (billing-platform-api-dev-run@${var.project_id}.iam.gserviceaccount.com):
+       escopos
+         https://www.googleapis.com/auth/admin.directory.group.readonly
+         https://www.googleapis.com/auth/admin.directory.group.member.readonly
+       Motivo: checar pertencimento a gcp-dp6-gti@dp6.com.br pra liberar a aba ADM.
+       Só esses 2 -- dev nunca manda e-mail de verdade (roda em dry-run).
+
+    2) SA de runtime PROD (billing-platform-api-prod-run@${var.project_id}.iam.gserviceaccount.com):
+       os MESMOS 2 escopos acima + adicionalmente
+         https://www.googleapis.com/auth/gmail.send
+       Motivo do gmail.send (SO aqui): disparo do relatorio semanal de custo por
+       e-mail, impersonando admin.victoria@dp6.com.br.
+
+    Sem isso: só matheus.fuzati@dp6.com.br (e-mail bootstrap, fail-closed por
+    design) consegue acessar a aba ADM; o relatório semanal roda em dry-run
+    pra sempre em qualquer ambiente.
+  EOT
+}

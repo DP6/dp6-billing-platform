@@ -251,6 +251,53 @@ class WaterfallStepDTO(BaseModel):
     kind: str  # start | decrease | end
 
 
+class MeDTO(BaseModel):
+    """Identidade do caller (via IAP) + se pertence ao grupo ADM. So isso decide
+    se a aba ADM aparece no front -- a garantia de verdade é o require_admin()
+    de cada endpoint /adm/*, nunca esconder a aba sozinho."""
+    email: str
+    is_admin: bool
+
+
+class BudgetConfigDTO(BaseModel):
+    """1 linha de budgets/{scope} no Firestore. scope = project_id, ou o
+    sentinel "_account" pro orcamento da conta inteira."""
+    scope: str
+    project_name: str | None = None
+    budget_brl: float
+    emails: list[str]
+    updated_at: str | None = None
+    updated_by: str | None = None
+
+
+class BudgetConfigUpsertDTO(BaseModel):
+    budget_brl: float
+    emails: list[str]
+
+
+class WeeklyReportConfigDTO(BaseModel):
+    enabled: bool
+    updated_at: str | None = None
+    updated_by: str | None = None
+    last_run_at: str | None = None
+    last_run_status: str | None = None
+
+
+class WeeklyReportConfigUpdateDTO(BaseModel):
+    enabled: bool
+
+
+class SendNowRequestDTO(BaseModel):
+    scope: str | None = None  # None = todos os budgets cadastrados
+
+
+class SendNowResultDTO(BaseModel):
+    dry_run: bool
+    scopes_sent: list[str]
+    scopes_failed: list[str]
+    preview_html: str | None = None  # só quando dry_run=true, pra tela do ADM mostrar
+
+
 class AnomalyRowDTO(BaseModel):
     usage_date: str
     project_id: str

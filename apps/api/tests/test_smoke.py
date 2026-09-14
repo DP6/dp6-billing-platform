@@ -56,6 +56,7 @@ ENDPOINTS = [
     ("/api/efficiency/waterfall", {}),
     ("/api/anomalies", {}),
     ("/api/anomalies", {"project": "dp6-ci-polaris"}),
+    ("/api/me", {}),
 ]
 
 
@@ -74,3 +75,26 @@ def test_scorecard_shape():
 def test_recommendations_sum():
     r = client.get("/api/optimization/recommendations").json()
     assert r["potential_savings_max_brl"] >= r["potential_savings_min_brl"] > 0
+
+
+def test_me_not_admin_without_iap():
+    r = client.get("/api/me")
+    assert r.status_code == 200
+    assert r.json() == {"email": "", "is_admin": False}
+
+
+def test_adm_budgets_forbidden_without_admin():
+    r = client.get("/api/adm/budgets")
+    assert r.status_code == 403
+
+
+def test_adm_budgets_ok_with_dev_force_admin(monkeypatch):
+    from billing_api.config import get_settings
+
+    monkeypatch.setenv("BILLING_API_DEV_FORCE_ADMIN", "1")
+    get_settings.cache_clear()
+    try:
+        r = client.get("/api/adm/budgets")
+        assert r.status_code == 200
+    finally:
+        get_settings.cache_clear()
