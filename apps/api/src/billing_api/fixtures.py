@@ -103,6 +103,26 @@ COVERAGE_WEEKLY = [
     {"week_start": "2026-09-07", "pct_app": 0.04, "pct_environment": 0.042, "pct_managed_by": 0.10},
 ]
 
+# cobertura por componente -- so mock ainda (Dataform deste repo nunca rodou de verdade).
+COVERAGE_BY_COMPONENT = [
+    {"service_description": "(geral)", "resources_total": 26, "pct_app": 0.1538, "pct_environment": 0.1538, "pct_managed_by": 0.50},
+    {"service_description": "Cloud Run", "resources_total": 13, "pct_app": 0.2308, "pct_environment": 0.2308, "pct_managed_by": 0.9231},
+    {"service_description": "Secret Manager", "resources_total": 13, "pct_app": 0.0769, "pct_environment": 0.0769, "pct_managed_by": 0.0769},
+]
+
+# recursos com >=1 label faltando, ordenado por custo -- detalhamento acionavel do
+# COVERAGE_BY_COMPONENT acima. So mock ainda (Dataform deste repo nunca rodou de verdade).
+UNLABELED_RESOURCES = [
+    {"service_description": "Cloud Run", "resource_name": "backend-dev", "missing_app": True, "missing_environment": True, "missing_managed_by": False, "net_cost_brl": 10.9611},
+    {"service_description": "Cloud Run", "resource_name": "frontend-dev", "missing_app": True, "missing_environment": True, "missing_managed_by": False, "net_cost_brl": 5.7231},
+    {"service_description": "Cloud Run", "resource_name": "backend-prod", "missing_app": True, "missing_environment": True, "missing_managed_by": False, "net_cost_brl": 2.4888},
+    {"service_description": "Cloud Run", "resource_name": "frontend-prod", "missing_app": True, "missing_environment": True, "missing_managed_by": False, "net_cost_brl": 1.986},
+    {"service_description": "Secret Manager", "resource_name": "JWT_SECRET_DEV", "missing_app": True, "missing_environment": True, "missing_managed_by": True, "net_cost_brl": 0.2553},
+    {"service_description": "Secret Manager", "resource_name": "GOOGLE_OAUTH_CLIENT_SECRET_PROD", "missing_app": True, "missing_environment": True, "missing_managed_by": True, "net_cost_brl": 0.2553},
+    {"service_description": "Cloud Run", "resource_name": "polaris", "missing_app": True, "missing_environment": True, "missing_managed_by": True, "net_cost_brl": 0.0526},
+    {"service_description": "Cloud Run", "resource_name": "billing-api-dev", "missing_app": True, "missing_environment": True, "missing_managed_by": False, "net_cost_brl": 0.0362},
+]
+
 ALLOC_BY_APP = {
     "rows": [
         {"label_app": "atlas", "net_cost_brl": 0.60},
