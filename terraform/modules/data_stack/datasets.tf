@@ -43,3 +43,19 @@ moved {
   from = google_bigquery_dataset_iam_member.api_reporting_viewer
   to   = google_bigquery_dataset_iam_member.api_viewer["reporting"]
 }
+
+# rpt_label_coverage_by_component/rpt_unlabeled_resources leem stg_billing_platform direto
+# (precisam de resource_global_name, que nao sobrevive na mart) -- sem isso, a SA de runtime
+# da API (que so tem acesso a reporting/mart, de proposito) toma 403 ao consultar essas 2
+# views, mesmo tendo acesso a "reporting". "Authorized view": autoriza so essas views
+# especificas a ler stg, sem abrir a stg inteira pra ninguem.
+resource "google_bigquery_dataset_access" "stg_authorizes_component_coverage_views" {
+  for_each   = toset(["rpt_label_coverage_by_component", "rpt_unlabeled_resources"])
+  project    = var.project_id
+  dataset_id = google_bigquery_dataset.this["stg"].dataset_id
+  view {
+    project_id = var.project_id
+    dataset_id = google_bigquery_dataset.this["reporting"].dataset_id
+    table_id   = each.value
+  }
+}
