@@ -1,0 +1,40 @@
+config {
+  type: "view",
+  schema: dataform.projectConfig.vars.reporting_dataset,
+  tags: ["billing_platform"],
+  description: "Lista os recursos (dentro de LABEL_COVERAGE_APPLICABLE_SERVICES -- Cloud Run, Secret Manager) que faltam pelo menos 1 label no export, pra time de plataforma ir aplicar na origem. Companion de rpt_label_coverage_by_component. Vale pra conta inteira. Janela: ultimos 30 dias, ordenado por custo (prioriza o que mais pesa)."
+}
+
+js { const c = require("includes/constants"); }
+
+WITH resources AS (
+  SELECT
+    service_description,
+    resource_global_name,
+    LOGICAL_OR(label_app IS NOT NULL)         AS has_app,
+    LOGICAL_OR(label_environment IS NOT NULL) AS has_environment,
+    LOGICAL_OR(label_managed_by IS NOT NULL)  AS has_managed_by,
+    SUM(net_cost_brl)                         AS net_cost_brl
+  FROM ${ref("stg_billing_platform")}
+  WHERE resource_global_name IS NOT NULL
+    AND usage_date >= DATE_SUB(CURRENT_DATE('${c.TIMEZONE}'), INTERVAL 30 DAY)
+    AND service_description IN (${c.LABEL_COVERAGE_APPLICABLE_SERVICES.map((s) => `'${s}'`).join(", ")})
+  GROUP BY service_description, resource_global_name
+)
+
+SELECT
+  service_description,
+  CASE
+    WHEN service_description = 'Cloud Run'
+      THEN REGEXP_EXTRACT(resource_global_name, r'/(?:services|jobs)/([^/]+)$')
+    WHEN service_description = 'Secret Manager'
+      THEN REGEXP_EXTRACT(resource_global_name, r'/secrets/([^/]+)$')
+    ELSE resource_global_name
+  END AS resource_name,
+  NOT has_app         AS missing_app,
+  NOT has_environment AS missing_environment,
+  NOT has_managed_by  AS missing_managed_by,
+  net_cost_brl
+FROM resources
+WHERE NOT has_app OR NOT has_environment OR NOT has_managed_by
+ORDER BY net_cost_brl DESC

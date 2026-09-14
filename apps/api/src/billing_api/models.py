@@ -134,6 +134,28 @@ class CoverageWeekDTO(BaseModel):
     pct_managed_by: float
 
 
+class ComponentLabelCoverageDTO(BaseModel):
+    """Cobertura por componente (Cloud Run, Secret Manager, ...) — % de RECURSOS distintos
+    com cada label aplicado no export, independente de custo/volume. "(geral)" é a agregação
+    de todos os componentes aplicáveis (rpt_label_coverage_by_component)."""
+    service_description: str
+    resources_total: int
+    pct_app: float
+    pct_environment: float
+    pct_managed_by: float
+
+
+class UnlabeledResourceDTO(BaseModel):
+    """1 linha por recurso com pelo menos 1 label faltando (rpt_unlabeled_resources) —
+    detalhamento acionável pro time de plataforma ir aplicar o label na origem."""
+    service_description: str
+    resource_name: str
+    missing_app: bool
+    missing_environment: bool
+    missing_managed_by: bool
+    net_cost_brl: float
+
+
 class AppRowDTO(BaseModel):
     label_app: str
     net_cost_brl: float

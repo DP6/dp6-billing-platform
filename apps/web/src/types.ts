@@ -111,6 +111,21 @@ export interface CoverageWeek {
   pct_environment: number;
   pct_managed_by: number;
 }
+export interface ComponentLabelCoverage {
+  service_description: string;
+  resources_total: number;
+  pct_app: number;
+  pct_environment: number;
+  pct_managed_by: number;
+}
+export interface UnlabeledResource {
+  service_description: string;
+  resource_name: string;
+  missing_app: boolean;
+  missing_environment: boolean;
+  missing_managed_by: boolean;
+  net_cost_brl: number;
+}
 export interface AppAllocation {
   rows: { label_app: string; net_cost_brl: number }[];
   unallocated_net_cost_brl: number;
