@@ -10,6 +10,7 @@ locals {
     "roles/iam.roleViewer",
     "roles/iam.serviceAccountViewer", # refresh das SAs de runtime (billing-*-run) no plan
     "roles/iap.admin",                # nao ha "iap viewer"; o plan le iap.webServices.getIamPolicy. Job so roda `terraform plan`.
+    "roles/datastore.viewer",         # refresh do google_firestore_database (environments/{dev,prod}/main.tf) no plan
   ]
 
   # apply: cria toda a infra dos environments (datasets, Dataform configs, Cloud Run, IAP, IAM, alertas)
