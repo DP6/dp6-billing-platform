@@ -2,14 +2,12 @@ config {
   type: "view",
   schema: dataform.projectConfig.vars.reporting_dataset,
   tags: ["billing_platform"],
-  description: "1 linha: KPIs do mes corrente (MTD) + mes anterior fechado + orcamento, conta inteira. Serve o scorecard da Visao geral. Sem quebra por project_id de proposito — e um card de 1 linha; um scorecard por projeto e um filtro futuro na API/UI, nao uma mudanca de grao aqui."
+  description: "1 linha: KPIs do mes corrente (MTD) + mes anterior fechado + orcamento, conta inteira. Serve o scorecard da Visao geral. Sem quebra por project_id de proposito — e um card de 1 linha; um scorecard por projeto e um filtro futuro na API/UI, nao uma mudanca de grao aqui. mtd/prevm somam por usage_date (nao invoice_month) -- mesmo grao que rpt_cost_daily/allocation/etc, pra bater com o 'Custo liquido' do bloco Periodo (que tambem soma por usage_date) quando o filtro esta em 'mes corrente'. invoice_month e restatement fazem esse numero divergir de um rollup por invoice_month como o antigo agg_billing_cost_monthly."
 }
 
 js { const c = require("includes/constants"); }
 
-WITH cur AS ( SELECT FORMAT_DATE('%Y%m', CURRENT_DATE('${dataform.projectConfig.vars.timezone}')) AS ym ),
-prev AS ( SELECT FORMAT_DATE('%Y%m', DATE_SUB(DATE_TRUNC(CURRENT_DATE('${dataform.projectConfig.vars.timezone}'), MONTH), INTERVAL 1 DAY)) AS ym ),
-cal AS (
+WITH cal AS (
   SELECT
     EXTRACT(DAY FROM CURRENT_DATE('${dataform.projectConfig.vars.timezone}')) AS days_elapsed,
     EXTRACT(DAY FROM DATE_SUB(DATE_ADD(DATE_TRUNC(CURRENT_DATE('${dataform.projectConfig.vars.timezone}'), MONTH), INTERVAL 1 MONTH), INTERVAL 1 DAY)) AS days_in_month
@@ -21,15 +19,19 @@ mtd AS (
     SUM(net_cost_brl)     AS net_cost_mtd_brl,
     SUM(net_cost_usd)    AS net_cost_mtd_usd,
     SUM(cost_at_list_brl) AS cost_at_list_mtd_brl
-  FROM ${ref("agg_billing_cost_monthly")} WHERE invoice_month = (SELECT ym FROM cur)
+  FROM ${ref("fct_billing_cost_daily")}
+  WHERE usage_date >= DATE_TRUNC(CURRENT_DATE('${dataform.projectConfig.vars.timezone}'), MONTH)
+    AND usage_date <= CURRENT_DATE('${dataform.projectConfig.vars.timezone}')
 ),
 prevm AS (
   SELECT SUM(net_cost_brl) AS prev_month_net_brl
-  FROM ${ref("agg_billing_cost_monthly")} WHERE invoice_month = (SELECT ym FROM prev)
+  FROM ${ref("fct_billing_cost_daily")}
+  WHERE usage_date >= DATE_SUB(DATE_TRUNC(CURRENT_DATE('${dataform.projectConfig.vars.timezone}'), MONTH), INTERVAL 1 MONTH)
+    AND usage_date < DATE_TRUNC(CURRENT_DATE('${dataform.projectConfig.vars.timezone}'), MONTH)
 )
 
 SELECT
-  (SELECT ym FROM cur)                                                     AS invoice_month,
+  FORMAT_DATE('%Y%m', CURRENT_DATE('${dataform.projectConfig.vars.timezone}'))          AS invoice_month,
   mtd.net_cost_mtd_brl,
   mtd.net_cost_mtd_usd,
   mtd.gross_cost_mtd_brl,

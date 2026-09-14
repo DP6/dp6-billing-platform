@@ -514,6 +514,37 @@ def alloc_coverage_weekly(
     return [m.CoverageWeekDTO(**r) for r in rows]
 
 
+@router.get("/allocation/coverage/by-component", response_model=list[m.ComponentLabelCoverageDTO])
+def alloc_coverage_by_component() -> list[m.ComponentLabelCoverageDTO]:
+    """Cobertura por RECURSO (não por custo) — só componentes onde label é aplicável de
+    verdade (Cloud Run, Secret Manager; BigQuery fica de fora — ver includes/constants.js).
+    "(geral)" é a agregação, conta inteira. Independe do que rodou/custou cada recurso.
+    TODO: aceitar `project` (view hoje agrega a conta inteira)."""
+    if mock_active():
+        return [m.ComponentLabelCoverageDTO(**c) for c in fx.COVERAGE_BY_COMPONENT]
+    rows = query(f"""
+        SELECT service_description, resources_total, pct_app, pct_environment, pct_managed_by
+        FROM `{RPT}.rpt_label_coverage_by_component`
+        ORDER BY service_description = '(geral)' DESC, service_description
+    """)
+    return [m.ComponentLabelCoverageDTO(**r) for r in rows]
+
+
+@router.get("/allocation/coverage/unlabeled-resources", response_model=list[m.UnlabeledResourceDTO])
+def alloc_unlabeled_resources() -> list[m.UnlabeledResourceDTO]:
+    """Detalhamento acionável do endpoint acima: 1 linha por recurso com >=1 label faltando,
+    ordenado por custo — pra aplicar o label na origem (Terraform/gcloud), não no billing."""
+    if mock_active():
+        return [m.UnlabeledResourceDTO(**r) for r in fx.UNLABELED_RESOURCES]
+    rows = query(f"""
+        SELECT service_description, resource_name, missing_app, missing_environment,
+               missing_managed_by, net_cost_brl
+        FROM `{RPT}.rpt_unlabeled_resources`
+        ORDER BY net_cost_brl DESC
+    """)
+    return [m.UnlabeledResourceDTO(**r) for r in rows]
+
+
 @router.get("/allocation/by-app", response_model=m.AppAllocationDTO)
 def alloc_by_app(
     from_: DateStr = Query(alias="from"), to: DateStr = Query(...),

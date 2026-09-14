@@ -1,12 +1,11 @@
 import { HBars } from "../charts/HBars";
 import { PercentLines } from "../charts/PercentLines";
-import { RingStat } from "../charts/RingStat";
 import { Chip, DataTable, LoadingOrError, MetricGrid, MetricTile, PageHeader, Panel, StatusBadge } from "../components/ui";
 import { useApi } from "../lib/api";
-import { brl, pctPlain, dayLabel, monthLabel as ymLabel } from "../lib/format";
+import { brl, pctPlain, dayLabel } from "../lib/format";
 import { chartColor } from "../charts/palette";
 import { filterParams, resolveWindow, scopeParams, useFilters } from "../lib/useFilters";
-import type { AppAllocation, ChargebackReadiness, CoverageWeek, EnvAllocation, LabelCoverage } from "../types";
+import type { AppAllocation, ChargebackReadiness, ComponentLabelCoverage, CoverageWeek, EnvAllocation, UnlabeledResource } from "../types";
 
 const groupEyebrow = {
   font: "500 10px/1 Ubuntu, sans-serif",
@@ -69,7 +68,8 @@ export function Alocacao() {
   const scope = scopeParams(f);
   const win = resolveWindow(f);
 
-  const coverage = useApi<LabelCoverage[]>("/allocation/coverage", { months: "1", project: f.project });
+  const coverageByComponent = useApi<ComponentLabelCoverage[]>("/allocation/coverage/by-component");
+  const unlabeled = useApi<UnlabeledResource[]>("/allocation/coverage/unlabeled-resources");
   const weekly = useApi<CoverageWeek[]>("/allocation/coverage/weekly", scope);
   // by-app/by-env agora respeitam Período + Serviço/Ambiente/Projeto do FilterBar — leem
   // fct_billing_cost_daily por usage_date, não mais um agregado mensal fixo.
@@ -77,7 +77,6 @@ export function Alocacao() {
   const byEnv = useApi<EnvAllocation>("/allocation/by-env", filterParams(f));
   const chargeback = useApi<ChargebackReadiness>("/allocation/chargeback-readiness");
 
-  const cov = coverage.data?.[0];
   const janela = `${dayLabel(win.from)} a ${dayLabel(win.to)}`;
 
   return (
@@ -89,16 +88,55 @@ export function Alocacao() {
       />
 
       <Panel
-        title="Cobertura de label · por custo"
-        cap={`Cada anel = fração do custo líquido do mês com aquela chave de label preenchida (não é sobre volume de recursos).${cov ? ` ${ymLabel(cov.invoice_month)} · ${brl(cov.net_cost_total_brl)} de custo líquido no mês.` : ""}`}
+        title="Cobertura de label · por componente"
+        cap='% de RECURSOS distintos (não de custo) com cada label aplicado no export, nos últimos 30 dias — independe de quanto cada recurso custou ou rodou no período, só olha se o label está lá. Conta inteira. Só entram componentes onde isso é mensurável (Cloud Run, Secret Manager); BigQuery fica de fora — job de BigQuery é uma execução, não um recurso rotulável.'
       >
-        <LoadingOrError loading={coverage.loading} error={coverage.error} />
-        {cov && (
-          <div style={{ display: "flex", gap: 32, flexWrap: "wrap", justifyContent: "space-around" }}>
-            <RingStat pct={cov.pct_managed_by} label="managed-by" caption={brl(cov.net_cost_total_brl * cov.pct_managed_by)} />
-            <RingStat pct={cov.pct_app} label="app" caption={brl(cov.net_cost_total_brl * cov.pct_app)} />
-            <RingStat pct={cov.pct_environment} label="ambiente" caption={brl(cov.net_cost_total_brl * cov.pct_environment)} />
-          </div>
+        <LoadingOrError loading={coverageByComponent.loading} error={coverageByComponent.error} />
+        {coverageByComponent.data && coverageByComponent.data.length > 0 && (
+          <DataTable
+            rows={coverageByComponent.data}
+            cols={[
+              {
+                key: "c",
+                label: "Componente",
+                render: (r: ComponentLabelCoverage) => <strong>{r.service_description}</strong>,
+                sort: (r) => r.service_description,
+              },
+              { key: "n", label: "Recursos", num: true, render: (r: ComponentLabelCoverage) => <span className="mono">{r.resources_total}</span>, sort: (r) => r.resources_total },
+              { key: "mb", label: "% managed-by", num: true, render: (r: ComponentLabelCoverage) => pctPlain(r.pct_managed_by), sort: (r) => r.pct_managed_by },
+              { key: "app", label: "% app", num: true, render: (r: ComponentLabelCoverage) => pctPlain(r.pct_app), sort: (r) => r.pct_app },
+              { key: "env", label: "% ambiente", num: true, render: (r: ComponentLabelCoverage) => pctPlain(r.pct_environment), sort: (r) => r.pct_environment },
+            ]}
+          />
+        )}
+      </Panel>
+
+      <Panel
+        title="Recursos sem label"
+        cap="Detalhamento acionável do painel acima — 1 linha por recurso com pelo menos 1 label faltando no export, ordenado por custo. Corrige-se na origem (Terraform/gcloud do recurso), não no billing."
+      >
+        <LoadingOrError loading={unlabeled.loading} error={unlabeled.error} />
+        {unlabeled.data && unlabeled.data.length > 0 && (
+          <DataTable
+            rows={unlabeled.data}
+            search={(r) => `${r.service_description} ${r.resource_name}`}
+            cols={[
+              { key: "svc", label: "Serviço", render: (r: UnlabeledResource) => r.service_description, sort: (r) => r.service_description },
+              { key: "res", label: "Recurso", render: (r: UnlabeledResource) => <span className="mono">{r.resource_name}</span>, sort: (r) => r.resource_name },
+              {
+                key: "miss",
+                label: "Faltando",
+                render: (r: UnlabeledResource) => (
+                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                    {r.missing_app && <Chip tone="bad">app</Chip>}
+                    {r.missing_environment && <Chip tone="bad">environment</Chip>}
+                    {r.missing_managed_by && <Chip tone="bad">managed-by</Chip>}
+                  </div>
+                ),
+              },
+              { key: "cost", label: "Custo (30d)", num: true, render: (r: UnlabeledResource) => <strong>{brl(r.net_cost_brl)}</strong>, sort: (r) => r.net_cost_brl },
+            ]}
+          />
         )}
       </Panel>
 

@@ -20,30 +20,40 @@ export interface Filters {
   project?: string;
 }
 
+// "hoje" em America/Sao_Paulo -- o mesmo fuso que o backend usa em todo CURRENT_DATE(...)
+// (scorecard, budget, coverage, etc.). Sem isso, o navegador calcula "hoje"/"1º do mês" em
+// UTC e diverge do servidor (BRT = UTC-3) — foi a causa de "Custo líquido" (usa from/to,
+// calculado aqui) não bater com métricas MTD calculadas direto no servidor.
+function todaySaoPaulo(): Date {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+  const [y, m, d] = parts.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)); // meia-noite UTC representando o dia calendário SP
+}
+
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 const daysAgo = (n: number) => {
-  const d = new Date();
+  const d = todaySaoPaulo();
   d.setUTCDate(d.getUTCDate() - n);
   return iso(d);
 };
 
 /** Resolve o preset (ou o range custom) numa janela {from,to} concreta. */
 export function resolveWindow(f: Filters): { from: string; to: string } {
-  const today = iso(new Date());
+  const today = iso(todaySaoPaulo());
   switch (f.period) {
     case "30d":
       return { from: daysAgo(29), to: today };
     case "90d":
       return { from: daysAgo(89), to: today };
     case "ano": {
-      const d = new Date();
+      const d = todaySaoPaulo();
       return { from: `${d.getUTCFullYear()}-01-01`, to: today };
     }
     case "custom":
       return { from: f.from ?? daysAgo(29), to: f.to ?? today };
     default: {
       // "mes": dia 1 do mês corrente -> hoje
-      const d = new Date();
+      const d = todaySaoPaulo();
       const first = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-01`;
       return { from: first, to: today };
     }

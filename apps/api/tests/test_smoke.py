@@ -40,6 +40,8 @@ ENDPOINTS = [
     ("/api/allocation/coverage", {"project": "dp6-ci-polaris"}),
     ("/api/allocation/coverage/weekly", {}),
     ("/api/allocation/coverage/weekly", {"project": "dp6-ci-polaris"}),
+    ("/api/allocation/coverage/by-component", {}),
+    ("/api/allocation/coverage/unlabeled-resources", {}),
     ("/api/allocation/by-app", RANGE),
     ("/api/allocation/by-app", {**RANGE, "project": "dp6-ci-polaris"}),
     ("/api/allocation/by-env", RANGE),

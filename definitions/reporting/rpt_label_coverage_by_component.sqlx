@@ -1,0 +1,66 @@
+config {
+  type: "view",
+  schema: dataform.projectConfig.vars.reporting_dataset,
+  tags: ["billing_platform"],
+  description: "Cobertura de label por COMPONENTE (Cloud Run, Secret Manager, ...) -- fracao de recursos DISTINTOS com cada label aplicado, independente de custo ou volume de execucoes/linhas de billing. So entram componentes onde label e aplicavel de verdade (LABEL_COVERAGE_APPLICABLE_SERVICES em includes/constants.js) -- BigQuery fica de fora (resource.global_name la e um Job ID, uma execucao, nao um recurso rotulavel), assim como Dataplex/Cloud Scheduler (resource.global_name sempre NULL, sem como identificar recurso). Vale pra conta inteira (resource.global_name ja embute o projeto). Janela: ultimos 30 dias (estado atual de rotulagem, nao historico)."
+}
+
+js { const c = require("includes/constants"); }
+
+WITH resources AS (
+  SELECT
+    service_description,
+    resource_global_name,
+    LOGICAL_OR(label_app IS NOT NULL)         AS has_app,
+    LOGICAL_OR(label_environment IS NOT NULL) AS has_environment,
+    LOGICAL_OR(label_managed_by IS NOT NULL)  AS has_managed_by
+  FROM ${ref("stg_billing_platform")}
+  WHERE resource_global_name IS NOT NULL
+    AND usage_date >= DATE_SUB(CURRENT_DATE('${c.TIMEZONE}'), INTERVAL 30 DAY)
+    AND service_description IN (${c.LABEL_COVERAGE_APPLICABLE_SERVICES.map((s) => `'${s}'`).join(", ")})
+  GROUP BY service_description, resource_global_name
+),
+
+by_component AS (
+  SELECT
+    service_description,
+    COUNT(*)             AS resources_total,
+    COUNTIF(has_app)         AS resources_with_app,
+    COUNTIF(has_environment) AS resources_with_environment,
+    COUNTIF(has_managed_by)  AS resources_with_managed_by
+  FROM resources
+  GROUP BY service_description
+),
+
+geral AS (
+  SELECT
+    "(geral)" AS service_description,
+    COUNT(*)             AS resources_total,
+    COUNTIF(has_app)         AS resources_with_app,
+    COUNTIF(has_environment) AS resources_with_environment,
+    COUNTIF(has_managed_by)  AS resources_with_managed_by
+  FROM resources
+)
+
+SELECT
+  service_description,
+  resources_total,
+  resources_with_app,
+  resources_with_environment,
+  resources_with_managed_by,
+  SAFE_DIVIDE(resources_with_app, resources_total)         AS pct_app,
+  SAFE_DIVIDE(resources_with_environment, resources_total) AS pct_environment,
+  SAFE_DIVIDE(resources_with_managed_by, resources_total)  AS pct_managed_by
+FROM by_component
+UNION ALL
+SELECT
+  service_description,
+  resources_total,
+  resources_with_app,
+  resources_with_environment,
+  resources_with_managed_by,
+  SAFE_DIVIDE(resources_with_app, resources_total)         AS pct_app,
+  SAFE_DIVIDE(resources_with_environment, resources_total) AS pct_environment,
+  SAFE_DIVIDE(resources_with_managed_by, resources_total)  AS pct_managed_by
+FROM geral
+ORDER BY service_description = "(geral)" DESC, service_description
