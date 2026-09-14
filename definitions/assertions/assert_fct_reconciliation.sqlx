@@ -1,7 +1,7 @@
 config {
   type: "assertion",
   tags: ["billing_platform"],
-  description: "Rede de seguranca do dedup: por invoice_month x project_id na janela, SUM(net) do fato tem que bater (tol. R$ 0,01) com SUM(cost) + SUM(creditos) direto da tabela de origem. Quebrado por projeto (nao so por invoice_month) para nao mascarar erro num projeto atras da soma da conta inteira."
+  description: "Rede de seguranca do dedup: por invoice_month x project_id na janela, SUM(net) do fato tem que bater (tol. R$ 0,01) com SUM(cost) + SUM(creditos) da origem DEDUPLICADA (mesmo fingerprint do stg_billing_platform). A origem reexporta a mesma linha varias vezes (so export_time muda) -- sem dedupar aqui tambem, a assertion compara o fct (corretamente deduplicado) contra um total inflado pelo reexport, e falsea um erro que nao existe (achado real em dev, 2026-09-14: 117 linhas duplicadas so em dp6-ci-trifecta/202608, R$ 24,22 de diferenca). Quebrado por projeto (nao so por invoice_month) para nao mascarar erro num projeto atras da soma da conta inteira."
 }
 
 js { const c = require("includes/constants"); }
@@ -12,13 +12,28 @@ WITH fct AS (
   WHERE ${c.lookbackFilter("usage_date")}
   GROUP BY invoice_month, project_id
 ),
+src_raw AS (
+  SELECT s.*
+  FROM ${ref(dataform.projectConfig.vars.source_table)} AS s
+  WHERE ${c.lookbackFilter("DATE(s.usage_start_time)")}
+),
+-- mesmo dedup do stg_billing_platform.sqlx (fingerprint da linha inteira, exceto export_time,
+-- mantem a reexportacao mais recente) — tem que ser identico, senao a assertion compara coisas
+-- diferentes.
+src_deduped AS (
+  SELECT r.*
+  FROM src_raw AS r
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY FARM_FINGERPRINT(TO_JSON_STRING((SELECT AS STRUCT r.* EXCEPT (export_time))))
+    ORDER BY r.export_time DESC
+  ) = 1
+),
 src AS (
   SELECT
     invoice.month AS invoice_month,
     project.id AS project_id,
     ROUND(SUM(cost) + SUM((SELECT IFNULL(SUM(cr.amount), 0) FROM UNNEST(credits) cr)), 2) AS src_net_brl
-  FROM ${ref(dataform.projectConfig.vars.source_table)}
-  WHERE ${c.lookbackFilter("DATE(usage_start_time)")}
+  FROM src_deduped
   GROUP BY invoice_month, project_id
 )
 

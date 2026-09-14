@@ -63,3 +63,16 @@ resource "google_project_iam_member" "dataform_job_user" {
   role    = "roles/bigquery.jobUser"
   member  = "serviceAccount:${google_service_account.dataform.email}"
 }
+
+# Acesso operacional pra disparar execucoes manuais do Dataform (Console/API) — sem isso, so as
+# SAs de CI (gh-apply-*, com dataform.admin) conseguem rodar um workflowInvocation; humano
+# nenhum consegue. O repo-irmao (polaris-cost-model) resolve isso com dataform.editor NO
+# REPOSITORIO (fora do Terraform, aplicado a mao); aqui vai a nivel de PROJETO porque nem
+# matheus.fuzati@ tem dataform.repositories.setIamPolicy pra replicar o binding por repositorio
+# (so resourcemanager.projects.setIamPolicy, via gcp-ci-polaris@). Efeito colateral aceito: o
+# grupo billing@ tambem passa a poder operar o repo do cost-model (mesmo projeto, mesmo time).
+resource "google_project_iam_member" "dataform_editor_ops" {
+  project = var.project_id
+  role    = "roles/dataform.editor"
+  member  = "group:billing@dp6.com.br"
+}
