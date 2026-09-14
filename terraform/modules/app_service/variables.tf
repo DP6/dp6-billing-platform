@@ -35,3 +35,19 @@ variable "max_instances" {
   type    = number
   default = 2
 }
+
+# self-binding roles/iam.serviceAccountTokenCreator na propria SA de runtime --
+# permite assinar o JWT de delegacao (google.auth.iam.Signer) sem chave local,
+# usado pra impersonar um e-mail do Workspace (Directory API / Gmail API).
+# Ver apps/api/src/billing_api/workspace_directory.py e email_report.py.
+variable "enable_self_impersonation" {
+  type    = bool
+  default = false
+}
+
+# roles/datastore.user na SA de runtime -- acesso ao Firestore nomeado desta
+# app (aba ADM, budgets/e-mails).
+variable "enable_firestore" {
+  type    = bool
+  default = false
+}

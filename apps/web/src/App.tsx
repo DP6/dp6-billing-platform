@@ -11,24 +11,36 @@ import {
   useFilters,
 } from "./lib/useFilters";
 import { useTheme } from "./lib/useTheme";
+import { Adm } from "./screens/Adm";
 import { Alocacao } from "./screens/Alocacao";
 import { Anomalias } from "./screens/Anomalias";
 import { Eficiencia } from "./screens/Eficiencia";
 import { Servicos } from "./screens/Servicos";
 import { Tendencia } from "./screens/Tendencia";
 import { VisaoGeral } from "./screens/VisaoGeral";
-import type { Dimensions, Meta } from "./types";
+import type { Dimensions, Me, Meta } from "./types";
 
 // IA de 6 abas (specs/005-telas.md §0, era 8 — ver docs/adr/ADR-009-ia-6-abas.md):
 // Orçamento fundiu em Visão Geral; Otimização + Unit economics fundiram em Eficiência.
-const TABS = [
+type Tab = readonly [string, string, React.ComponentType];
+
+const BASE_TABS: Tab[] = [
   ["/", "Visão geral", VisaoGeral],
   ["/tendencia", "Tendência", Tendencia],
   ["/servicos", "Serviços & SKUs", Servicos],
   ["/alocacao", "Alocação", Alocacao],
   ["/eficiencia", "Eficiência & economia", Eficiencia],
   ["/anomalias", "Anomalias", Anomalias],
-] as const;
+];
+
+// aba ADM (cadastro de budget + relatório semanal) só aparece pra quem passa
+// no require_admin do backend (grupo gcp-dp6-gti@dp6.com.br + bootstrap) --
+// /me é chamado 2x de propósito (aqui e em Screens()), mesmo padrão que
+// FilterBar/VisaoGeral já usam pra /dimensions, sem levantar state.
+function useTabs(): Tab[] {
+  const me = useApi<Me>("/me");
+  return me.data?.is_admin ? [...BASE_TABS, ["/adm", "ADM", Adm]] : BASE_TABS;
+}
 
 const eyebrow = {
   font: "500 10px/1 Ubuntu, sans-serif",
@@ -265,6 +277,7 @@ function FilterBar() {
 }
 
 export default function App() {
+  const tabs = useTabs();
   return (
     <>
       <TopBar />
@@ -278,7 +291,7 @@ export default function App() {
           background: "var(--background)",
         }}
       >
-        {TABS.map(([to, label]) => (
+        {tabs.map(([to, label]) => (
           <NavLink
             key={to}
             to={to}
@@ -319,6 +332,7 @@ export default function App() {
  *  React poderia pular a atualização da tela). */
 function Screens() {
   useSearchParams();
+  const tabs = useTabs();
   return (
     <main
       style={{
@@ -331,7 +345,7 @@ function Screens() {
       }}
     >
       <Routes>
-        {TABS.map(([to, , Comp]) => (
+        {tabs.map(([to, , Comp]) => (
           <Route key={to} path={to} element={<Comp />} />
         ))}
       </Routes>

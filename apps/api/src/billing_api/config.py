@@ -43,6 +43,46 @@ class Settings(BaseSettings):
     # a imagem seta BILLING_API_STATIC_DIR=/app/static.
     static_dir: str = ""
 
+    # ---- aba ADM (budget por projeto + relatorio semanal) ----
+
+    # "dev" | "prod" -- unica fonte de verdade pro gate dry-run/envio real do
+    # relatorio por e-mail (email_report.py). Terraform seta por ambiente.
+    environment: str = "dev"
+
+    # Firestore: banco NOMEADO (nao o "(default)") -- mesmo projeto GCP tem
+    # mais de 1 app com Firestore (polaris-atlas usa hub-dev/hub-prod), entao
+    # cada um precisa do seu proprio banco pra nao misturar dado.
+    firestore_database: str = "billing-platform-dev"
+
+    # e-mail do Workspace impersonado (via domain-wide delegation) pra ler
+    # grupos no Admin SDK Directory API (workspace_directory.py) -- mesmo
+    # padrao do polaris-atlas. "" = integracao desligada (so o bootstrap
+    # email abaixo funciona), default seguro ate a TI configurar a delegacao.
+    workspace_impersonate_email: str = ""
+    admin_group_email: str = "gcp-dp6-gti@dp6.com.br"
+    # sempre admin, independente do Directory API -- break-glass permanente
+    # (nao remover depois que a delegacao estiver funcionando).
+    admin_bootstrap_emails: tuple[str, ...] = ("matheus.fuzati@dp6.com.br",)
+
+    # remetente do relatorio semanal (Gmail API, domain-wide delegation,
+    # escopo gmail.send -- so a SA de runtime de PROD tem esse escopo).
+    report_sender_email: str = "admin.victoria@dp6.com.br"
+
+    # e-mail da propria SA de runtime -- usado pelo Signer (auth.py/
+    # workspace_directory.py/email_report.py) pra assinar o JWT de delegacao
+    # sem chave local. Terraform injeta (nao dá pra a app descobrir sozinha
+    # sem uma chamada extra de metadata).
+    runtime_sa_email: str = ""
+
+    # e-mail da SA que o Cloud Scheduler usa pra invocar o job semanal
+    # (require_scheduler em auth.py). "" em dev -- scheduler so existe em prod.
+    scheduler_sa_email: str = ""
+
+    # escape-hatch SO pra dev local sem sessao de IAP de verdade -- nunca
+    # setado por Terraform (variavel de .env local). Com isso true, todo
+    # caller vira admin (bootstrap email), sem checar JWT/grupo nenhum.
+    dev_force_admin: bool = False
+
     @property
     def rpt(self) -> str:
         return f"`{self.gcp_project}.{self.reporting_dataset}`"

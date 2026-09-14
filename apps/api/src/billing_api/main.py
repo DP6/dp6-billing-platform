@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from .adm_routes import router as adm_router
 from .bq import mock_active
 from .config import get_settings
 from .routes import router
@@ -18,7 +19,9 @@ app = FastAPI(title="Painel FinOps CI Polaris — API", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=list(S.cors_origins),
-    allow_methods=["GET"],
+    # POST/PUT/DELETE: aba ADM (budget/e-mail/relatório semanal) -- primeira
+    # escrita deste app, antes disso era GET-only de propósito.
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["*"],
 )
 
@@ -44,6 +47,7 @@ def healthz() -> dict:
 
 
 app.include_router(router)
+app.include_router(adm_router)
 
 
 @app.middleware("http")

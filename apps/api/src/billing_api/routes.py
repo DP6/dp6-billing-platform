@@ -8,6 +8,7 @@ from pathlib import Path
 import yaml
 from fastapi import APIRouter, Query
 
+from . import firestore as fsdb
 from . import fixtures as fx
 from . import models as m
 from .bq import mock_active, query
@@ -45,6 +46,16 @@ def _scope(
 
 def _has_scope(service: str | None, environment: str | None, app: str | None, project: str | None = None) -> bool:
     return bool(service or environment or app or project)
+
+
+def _effective_budget_brl(project: str | None) -> float:
+    """Budget por escopo (aba ADM, Firestore) com fallback pra constante
+    fixa de Settings -- fica ao vivo (sem o lag do cron diário do Dataform),
+    e nenhuma view .sqlx precisa mudar pra isso funcionar."""
+    if mock_active():
+        return S.monthly_budget_brl
+    cfg = fsdb.get_budget_or_none(project or fsdb.ACCOUNT_SCOPE)
+    return float(cfg["budget_brl"]) if cfg else S.monthly_budget_brl
 
 
 # ---------------------------------------------------------------- meta / dimensions / scorecard
@@ -148,7 +159,7 @@ def scorecard(
     days_elapsed = int(cal["days_elapsed"] or 1) or 1
     days_in_month = int(cal["days_in_month"] or 30)
     run_rate = net_mtd / days_elapsed * days_in_month
-    budget = S.monthly_budget_brl
+    budget = _effective_budget_brl(project)
 
     if from_ and to:
         win = query(f"""
@@ -170,6 +181,12 @@ def scorecard(
         net_prev = float(prev["net"] or 0.0)
     elif not _has_scope(service, environment, app, project):
         r = query(f"SELECT * FROM `{RPT}.rpt_cost_scorecard`")[0]
+        # rpt_cost_scorecard traz budget_brl/budget_used_pct/run_rate_vs_budget_pct
+        # compilados com a constante velha do Dataform (nenhum .sqlx muda pra
+        # aba ADM, ver _effective_budget_brl) -- sobrescreve com o valor vivo.
+        r["budget_brl"] = budget
+        r["budget_used_pct"] = (float(r["net_cost_mtd_brl"]) / budget) if budget else 0.0
+        r["run_rate_vs_budget_pct"] = (float(r["run_rate_eom_brl"]) / budget) if budget else 0.0
         return m.ScorecardDTO(**r)
     else:
         prevm = query(f"""
@@ -390,23 +407,26 @@ def budget(
     project: str | None = None,
 ) -> m.BudgetDTO:
     sc = scorecard(service, environment, app, project)
-    thresholds = [m.ThresholdDTO(pct=p, value_brl=S.monthly_budget_brl * p) for p in S.budget_thresholds]
+    bud = _effective_budget_brl(project)
+    thresholds = [m.ThresholdDTO(pct=p, value_brl=bud * p) for p in S.budget_thresholds]
     breach: str | None = None
-    if mock_active():
+    # rpt_budget_daily não tem project_id (é só conta inteira) -- comparar a
+    # curva dela contra o budget de 1 projeto não faz sentido, então pula.
+    if mock_active() or project:
         rows = []
     else:
         rows = query(f"SELECT usage_date, net_cost_cum_brl FROM `{RPT}.rpt_budget_daily` ORDER BY usage_date")
         for r in rows:
-            if r["net_cost_cum_brl"] and r["net_cost_cum_brl"] >= S.monthly_budget_brl:
+            if r["net_cost_cum_brl"] and r["net_cost_cum_brl"] >= bud:
                 breach = str(r["usage_date"])
                 break
     return m.BudgetDTO(
-        budget_brl=S.monthly_budget_brl,
+        budget_brl=bud,
         net_cost_mtd_brl=sc.net_cost_mtd_brl,
         run_rate_eom_brl=sc.run_rate_eom_brl,
         budget_used_pct=sc.budget_used_pct,
         run_rate_vs_budget_pct=sc.run_rate_vs_budget_pct,
-        headroom_brl=S.monthly_budget_brl - sc.run_rate_eom_brl,
+        headroom_brl=bud - sc.run_rate_eom_brl,
         projected_breach_date=breach,
         thresholds=thresholds,
     )
@@ -427,8 +447,12 @@ def burndown(month: str | None = None) -> list[m.BurndownPointDTO]:
         SELECT usage_date, net_cost_cum_brl, budget_brl, is_realized
         FROM `{RPT}.rpt_budget_daily` ORDER BY usage_date
     """)
+    # sobrescreve com o valor vivo (conta inteira, essa view não tem project_id) --
+    # senão /budget e /budget/burndown mostram números diferentes logo depois
+    # de uma edição no ADM (a view ainda traz a constante velha do Dataform).
+    bud = _effective_budget_brl(None)
     return [m.BurndownPointDTO(usage_date=str(r["usage_date"]), net_cost_cum_brl=r["net_cost_cum_brl"],
-                               budget_brl=r["budget_brl"], is_realized=bool(r["is_realized"])) for r in rows]
+                               budget_brl=bud, is_realized=bool(r["is_realized"])) for r in rows]
 
 
 @router.get("/forecast", response_model=list[m.ForecastMonthDTO])

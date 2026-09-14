@@ -41,9 +41,12 @@ variable "api_image" {
 # (inventado pela renomeacao mecanica do fork) nunca existiu de verdade e a politica do IAP
 # ficava vazia. NAO reaproveitar o gcp-ci-polaris@ do repo-irmao: aquele grupo da acesso a
 # 1 projeto so, e este painel mostra o custo de TODOS os projetos da conta de faturamento.
+# gcp-dp6-gti@ acrescentado pra aba ADM (2026-09-14) -- sem isso o grupo ADM
+# nem passa do IAP pra chegar no require_admin() da aplicacao (2 portoes
+# independentes, ver auth.py).
 variable "iap_allowed_members" {
   type    = list(string)
-  default = ["group:billing@dp6.com.br", "user:matheus.fuzati@dp6.com.br"]
+  default = ["group:billing@dp6.com.br", "user:matheus.fuzati@dp6.com.br", "group:gcp-dp6-gti@dp6.com.br"]
 }
 
 variable "alert_email" {

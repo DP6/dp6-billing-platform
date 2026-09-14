@@ -14,6 +14,22 @@ export async function apiGet<T>(path: string, params?: Record<string, string | u
   return res.json() as Promise<T>;
 }
 
+async function apiMutate<T>(method: "POST" | "PUT" | "DELETE", path: string, body?: unknown): Promise<T> {
+  const res = await fetch(`${BASE}/api${path}`, {
+    method,
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: body != null ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    const b = await res.json().catch(() => ({}));
+    throw new Error(b?.error?.message ?? `${res.status} ${res.statusText}`);
+  }
+  return res.status === 204 ? (undefined as T) : (res.json() as Promise<T>);
+}
+export const apiPost = <T>(path: string, body?: unknown) => apiMutate<T>("POST", path, body);
+export const apiPut = <T>(path: string, body?: unknown) => apiMutate<T>("PUT", path, body);
+export const apiDelete = <T>(path: string) => apiMutate<T>("DELETE", path);
+
 type State<T> = { data?: T; error?: string; loading: boolean };
 
 /** Hook simples de fetch. Refaz quando o `key` muda (ex.: filtros serializados). */
@@ -32,4 +48,23 @@ export function useApi<T>(path: string, params?: Record<string, string | undefin
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
   return state;
+}
+
+/** Estado de uma mutação (POST/PUT/DELETE) — sem cache/invalidação, o caller
+ *  refaz o fetch da lista depois de `run` resolver (mesmo espírito simples
+ *  de `useApi`; não compensa trazer react-query/SWR pra uma tela de admin). */
+export function useMutationState<T>() {
+  const [state, setState] = useState<{ loading: boolean; error?: string }>({ loading: false });
+  const run = async (fn: () => Promise<T>): Promise<T> => {
+    setState({ loading: true });
+    try {
+      const r = await fn();
+      setState({ loading: false });
+      return r;
+    } catch (e) {
+      setState({ loading: false, error: String((e as Error).message ?? e) });
+      throw e;
+    }
+  };
+  return { ...state, run };
 }

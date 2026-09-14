@@ -26,6 +26,8 @@ locals {
     "roles/iam.serviceAccountUser",
     "roles/resourcemanager.projectIamAdmin", # amplo — necessario para bindings de IAM nos environments
     "roles/serviceusage.serviceUsageConsumer",
+    "roles/datastore.owner",      # cria o google_firestore_database (environments/{dev,prod}/main.tf, aba ADM)
+    "roles/cloudscheduler.admin", # cria o google_cloud_scheduler_job (environments/prod/scheduler.tf)
   ]
 }
 
