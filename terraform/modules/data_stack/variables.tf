@@ -51,14 +51,12 @@ variable "freshness_threshold_hours" {
   default = 36
 }
 
-# Default false ate o Dataform materializar rpt_label_coverage_by_component/
-# rpt_unlabeled_resources pela 1a vez — hoje bloqueado pelo grant de TI ainda pendente em
-# stg_billing_platform (le a tabela bruta do billing export; ver docs/adr/ADR-003 e
-# terraform/bootstrap/README.md "Depois do apply"). Enquanto essas views nao existirem no
-# BigQuery, o `google_bigquery_dataset_access` que as autoriza falha no apply com "View ...
-# not found" (ja aconteceu: Deploy dev #17, 2026-09-14). Flipar para true so depois de
-# confirmar (via `bq ls`/console) que as 2 views existem em reporting_{env}.
+# Era false ate o Dataform materializar rpt_label_coverage_by_component/rpt_unlabeled_resources
+# pela 1a vez (bloqueado pelo grant de TI em stg_billing_platform, que le a tabela bruta do
+# billing export; ver docs/adr/ADR-003). Confirmado em 2026-09-14 que as 2 views existem em
+# reporting_dev e reporting_prod (1a carga do dev-daily/prod-daily, com o fix de
+# assert_fct_reconciliation — ver PRs #19, #23, #24) — true a partir daqui.
 variable "component_coverage_views_ready" {
   type    = bool
-  default = false
+  default = true
 }
