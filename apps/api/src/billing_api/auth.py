@@ -26,6 +26,26 @@ from .config import get_settings
 log = logging.getLogger("billing_api.auth")
 
 
+def _log_unverified_claims(token: str) -> None:
+    """SÓ diagnóstico -- não verifica assinatura, nunca usar pra decidir
+    autorização. Loga aud/iss/email uma vez por request, ajuda a descobrir o
+    formato exato do audience esperado (não documentado com clareza pro IAP
+    nativo do Cloud Run v2, sem Load Balancer clássico)."""
+    import base64
+    import json
+
+    try:
+        payload_b64 = token.split(".")[1]
+        payload_b64 += "=" * (-len(payload_b64) % 4)
+        claims = json.loads(base64.urlsafe_b64decode(payload_b64))
+        log.warning(
+            "IAP JWT recebido (NÃO verificado, só diagnóstico): aud=%s iss=%s email=%s",
+            claims.get("aud"), claims.get("iss"), claims.get("email"),
+        )
+    except Exception:
+        log.warning("Não consegui decodificar o JWT do IAP pra diagnóstico", exc_info=True)
+
+
 def get_caller_email(x_goog_iap_jwt_assertion: str | None = Header(default=None)) -> str | None:
     """E-mail verificado do caller, ou None se não der pra verificar (sem
     header, sem audience configurada, JWT inválido/expirado). Nunca levanta
@@ -35,7 +55,14 @@ def get_caller_email(x_goog_iap_jwt_assertion: str | None = Header(default=None)
         # escape-hatch só de dev local (.env) -- nunca setado por Terraform.
         return s.admin_bootstrap_emails[0] if s.admin_bootstrap_emails else None
 
-    if not x_goog_iap_jwt_assertion or not s.iap_audience:
+    if not x_goog_iap_jwt_assertion:
+        return None
+    if not s.iap_audience:
+        # BILLING_API_IAP_AUDIENCE ainda nao configurado -- loga o claim `aud`
+        # de verdade (sem verificar assinatura, so pra diagnostico) pra
+        # descobrir o formato certo antes de travar a config. Ver terraform/
+        # environments/{dev,prod}/main.tf.
+        _log_unverified_claims(x_goog_iap_jwt_assertion)
         return None
 
     try:
