@@ -16,6 +16,11 @@ locals {
     "cloudbuild.googleapis.com",
     "monitoring.googleapis.com",
     "logging.googleapis.com",
+    # aba ADM (budget/e-mail + relatorio semanal, ver plano "ADM tab")
+    "firestore.googleapis.com",
+    "admin.googleapis.com",          # Directory API -- checagem de grupo (workspace_directory.py)
+    "gmail.googleapis.com",          # envio do relatorio semanal (email_report.py)
+    "cloudscheduler.googleapis.com", # disparo semanal, so prod (environments/prod/scheduler.tf)
   ]
 }
 

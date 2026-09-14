@@ -29,6 +29,22 @@ resource "google_project_iam_member" "runtime_roles" {
   member   = "serviceAccount:${google_service_account.runtime.email}"
 }
 
+# self-binding: permite assinar o JWT de delegacao (Signer, sem chave local)
+# pra impersonar um e-mail do Workspace -- ver var.enable_self_impersonation.
+resource "google_service_account_iam_member" "runtime_self_token_creator" {
+  count              = var.enable_self_impersonation ? 1 : 0
+  service_account_id = google_service_account.runtime.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:${google_service_account.runtime.email}"
+}
+
+resource "google_project_iam_member" "firestore_access" {
+  count   = var.enable_firestore ? 1 : 0
+  project = var.project_id
+  role    = "roles/datastore.user"
+  member  = "serviceAccount:${google_service_account.runtime.email}"
+}
+
 # Cloud Run v2 — provider beta por causa de iap_enabled (igual ao modules/cloud-run do Atlas)
 resource "google_cloud_run_v2_service" "this" {
   provider = google-beta
@@ -60,6 +76,13 @@ resource "google_cloud_run_v2_service" "this" {
           name  = env.key
           value = env.value
         }
+      }
+      # e-mail da propria SA de runtime -- nao da pra passar via var.env_vars
+      # (seria module.api.runtime_sa_email referenciando a si mesmo). Usado
+      # pelo Signer em workspace_directory.py/email_report.py.
+      env {
+        name  = "BILLING_API_RUNTIME_SA_EMAIL"
+        value = google_service_account.runtime.email
       }
       resources {
         limits   = { cpu = "1", memory = "512Mi" }

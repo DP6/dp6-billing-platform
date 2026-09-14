@@ -35,10 +35,10 @@ variable "api_image" {
 }
 
 # Grupo dedicado criado pela TI em 2026-09-14 (billing@dp6.com.br) — mesma mudanca do dev
-# (ver comentario em environments/dev/variables.tf).
+# (ver comentario em environments/dev/variables.tf). gcp-dp6-gti@ acrescentado pra aba ADM.
 variable "iap_allowed_members" {
   type    = list(string)
-  default = ["group:billing@dp6.com.br", "user:matheus.fuzati@dp6.com.br"]
+  default = ["group:billing@dp6.com.br", "user:matheus.fuzati@dp6.com.br", "group:gcp-dp6-gti@dp6.com.br"]
 }
 
 variable "alert_email" {

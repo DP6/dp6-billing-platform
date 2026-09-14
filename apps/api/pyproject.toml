@@ -10,6 +10,10 @@ dependencies = [
   "pydantic-settings>=2.6",
   "google-cloud-bigquery>=3.27",
   "pyyaml>=6.0",
+  # aba ADM (budget/e-mail + relatório semanal)
+  "google-cloud-firestore>=2.19",
+  "google-auth>=2.34",
+  "matplotlib>=3.9",
 ]
 
 [dependency-groups]
