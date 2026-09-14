@@ -80,8 +80,10 @@ export function VisaoGeral() {
     grain: series.grain,
     group_by: series.groupBy,
   });
-  const byApp = useApi<AppAllocation>("/allocation/by-app", scopeParams(f));
-  const byEnv = useApi<EnvAllocation>("/allocation/by-env", scopeParams(f));
+  // by-app/by-env exigem from/to (allocation/by-app e /by-env leem fct_billing_cost_daily
+  // por usage_date) -- scopeParams não manda período, dava 422 (params obrigatórios ausentes).
+  const byApp = useApi<AppAllocation>("/allocation/by-app", filterParams(f));
+  const byEnv = useApi<EnvAllocation>("/allocation/by-env", filterParams(f));
 
   const s = sc.data;
   const d = dims.data;
