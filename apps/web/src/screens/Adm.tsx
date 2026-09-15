@@ -6,6 +6,20 @@ import type { BudgetConfig, Dimensions, SendNowResult, SyncBudgetsResult, Weekly
 
 const ACCOUNT_SCOPE = "_account";
 
+/** Dupla confirmação (2 diálogos) pra ação destrutiva em massa -- excluir
+ *  todo orçamento de projeto de uma vez (nunca a conta inteira, ver
+ *  fsdb.delete_budget). Usado nos dois painéis (Orçamentos e Relatório
+ *  semanal), que mostram a mesma lista por ângulos diferentes. */
+function confirmDeleteAll(count: number): boolean {
+  if (!confirm(`Excluir TODOS os ${count} orçamentos de projeto cadastrados? Essa ação não pode ser desfeita.`)) {
+    return false;
+  }
+  return confirm(
+    `Confirma de novo: isso apaga os ${count} orçamentos de projeto (e-mails, toggles, tudo). ` +
+      `O orçamento da conta inteira não é afetado. Tem certeza?`,
+  );
+}
+
 const fieldLabel: CSSProperties = {
   font: "500 10px/1 Ubuntu, sans-serif",
   letterSpacing: ".14em",
@@ -183,6 +197,15 @@ function BudgetsPanel({ budgets, dims, bump }: { budgets: BudgetConfig[]; dims: 
     bump();
   };
 
+  const delAll = useMutationState<void>();
+  const removeAll = async () => {
+    if (!confirmDeleteAll(projectBudgets.length)) return;
+    await delAll.run(async () => {
+      await Promise.all(projectBudgets.map((b) => apiDelete<void>(`/adm/budgets/${encodeURIComponent(b.scope)}`)));
+    });
+    bump();
+  };
+
   const sync = useMutationState<SyncBudgetsResult>();
   const [syncResult, setSyncResult] = useState<SyncBudgetsResult | null>(null);
   const syncNow = async () => {
@@ -254,13 +277,26 @@ function BudgetsPanel({ budgets, dims, bump }: { budgets: BudgetConfig[]; dims: 
       title="Orçamentos"
       cap="Budget e e-mails responsáveis, por projeto e para a conta inteira. Projeto com budget cadastrado no GCP entra aqui automaticamente na 1ª sincronização — os 2 toggles por linha controlam se orçamento/e-mails continuam vindo do GCP ou passam a ser manuais."
       actions={
-        <button type="button" onClick={syncNow} disabled={sync.loading} style={{ ...btnGhostStyle, ...btnSmallStyle }}>
-          {sync.loading ? "Sincronizando…" : "Sincronizar orçamentos do GCP agora"}
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button type="button" onClick={syncNow} disabled={sync.loading} style={{ ...btnGhostStyle, ...btnSmallStyle }}>
+            {sync.loading ? "Sincronizando…" : "Sincronizar orçamentos do GCP agora"}
+          </button>
+          {projectBudgets.length > 0 && (
+            <button
+              type="button"
+              onClick={removeAll}
+              disabled={delAll.loading}
+              style={{ ...btnGhostStyle, ...btnSmallStyle, color: "var(--bad)" }}
+            >
+              {delAll.loading ? "Excluindo…" : "Excluir todos os orçamentos de projeto"}
+            </button>
+          )}
+        </div>
       }
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         {sync.error && <span style={{ color: "var(--bad)", fontSize: 12.5 }}>{sync.error}</span>}
+        {delAll.error && <span style={{ color: "var(--bad)", fontSize: 12.5 }}>{delAll.error}</span>}
         {syncResult && (
           <span style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
             {syncResult.scopes_created.length > 0 && `criados: ${syncResult.scopes_created.join(", ")}. `}
@@ -413,6 +449,17 @@ function WeeklyReportPanel({ budgets, bump }: { budgets: BudgetConfig[]; bump: (
     bump();
   };
 
+  // nunca inclui _account (não pode ser excluído, ver fsdb.delete_budget).
+  const deletableRows = rows.filter((r) => r.scope !== ACCOUNT_SCOPE);
+  const delAll = useMutationState<void>();
+  const removeAll = async () => {
+    if (!confirmDeleteAll(deletableRows.length)) return;
+    await delAll.run(async () => {
+      await Promise.all(deletableRows.map((r) => apiDelete<void>(`/adm/budgets/${encodeURIComponent(r.scope)}`)));
+    });
+    bump();
+  };
+
   const sendNow = async (scope?: string) => {
     setSendingScope(scope ?? "*");
     try {
@@ -478,11 +525,22 @@ function WeeklyReportPanel({ budgets, bump }: { budgets: BudgetConfig[]; bump: (
                 <button type="button" onClick={() => setAll(false)} disabled={bulkToggle.loading} style={{ ...btnGhostStyle, ...btnSmallStyle }}>
                   desmarcar todos
                 </button>
+                {deletableRows.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={removeAll}
+                    disabled={delAll.loading}
+                    style={{ ...btnGhostStyle, ...btnSmallStyle, color: "var(--bad)" }}
+                  >
+                    {delAll.loading ? "Excluindo…" : "Excluir todos os orçamentos de projeto"}
+                  </button>
+                )}
                 <span style={{ flex: 1 }} />
                 <button type="button" onClick={() => sendNow()} disabled={send.loading} style={btnStyle}>
                   {sendingScope === "*" && send.loading ? "Enviando…" : "Enviar para todos"}
                 </button>
               </div>
+              {delAll.error && <span style={{ color: "var(--bad)", fontSize: 12.5 }}>{delAll.error}</span>}
               <DataTable cols={cols} rows={rows} defaultPageSize={10} />
             </>
           )}
