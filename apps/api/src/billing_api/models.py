@@ -39,7 +39,7 @@ class ScorecardDTO(BaseModel):
     run_rate_eom_brl: float
     days_elapsed: int
     days_in_month: int
-    budget_brl: float
+    budget_brl: float | None  # None = sem orçamento cadastrado na aba ADM pra esse escopo
     budget_used_pct: float
     run_rate_vs_budget_pct: float
     effective_savings_pct: float
@@ -94,12 +94,12 @@ class ThresholdDTO(BaseModel):
 
 
 class BudgetDTO(BaseModel):
-    budget_brl: float
+    budget_brl: float | None  # None = sem orçamento cadastrado na aba ADM pra esse escopo
     net_cost_mtd_brl: float
     run_rate_eom_brl: float
     budget_used_pct: float
     run_rate_vs_budget_pct: float
-    headroom_brl: float
+    headroom_brl: float | None
     projected_breach_date: str | None
     thresholds: list[ThresholdDTO]
 
@@ -107,7 +107,7 @@ class BudgetDTO(BaseModel):
 class BurndownPointDTO(BaseModel):
     usage_date: str
     net_cost_cum_brl: float
-    budget_brl: float
+    budget_brl: float | None
     is_realized: bool
 
 
@@ -261,11 +261,14 @@ class MeDTO(BaseModel):
 
 class BudgetConfigDTO(BaseModel):
     """1 linha de budgets/{scope} no Firestore. scope = project_id, ou o
-    sentinel "_account" pro orcamento da conta inteira."""
+    sentinel "_account" pro orcamento da conta inteira. report_enabled
+    controla só o disparo AUTOMATICO de segunda -- "enviar agora" (manual)
+    ignora essa flag de proposito, é sempre um disparo explícito."""
     scope: str
     project_name: str | None = None
     budget_brl: float
     emails: list[str]
+    report_enabled: bool = False
     updated_at: str | None = None
     updated_by: str | None = None
 
@@ -273,29 +276,33 @@ class BudgetConfigDTO(BaseModel):
 class BudgetConfigUpsertDTO(BaseModel):
     budget_brl: float
     emails: list[str]
+    # None = não mexe no toggle atual (o form de orçamento não reenvia isso de
+    # propósito -- só a tabela do relatório semanal, via PUT .../report-enabled,
+    # muda esse campo). set(merge=True) do Firestore SOBRESCREVE campo listado,
+    # então não dá pra mandar sempre False aqui sem resetar o toggle a cada edit.
+    report_enabled: bool | None = None
+
+
+class ReportEnabledUpdateDTO(BaseModel):
+    enabled: bool
 
 
 class WeeklyReportConfigDTO(BaseModel):
-    enabled: bool
-    updated_at: str | None = None
-    updated_by: str | None = None
+    """Bookkeeping GLOBAL do disparo automático (não tem mais toggle aqui --
+    o toggle é por budget, ver BudgetConfigDTO.report_enabled)."""
     last_run_at: str | None = None
     last_run_status: str | None = None
 
 
-class WeeklyReportConfigUpdateDTO(BaseModel):
-    enabled: bool
-
-
 class SendNowRequestDTO(BaseModel):
-    scope: str | None = None  # None = todos os budgets cadastrados
+    scope: str | None = None  # None = todos os budgets com e-mail cadastrado
 
 
 class SendNowResultDTO(BaseModel):
     dry_run: bool
     scopes_sent: list[str]
     scopes_failed: list[str]
-    preview_html: str | None = None  # só quando dry_run=true, pra tela do ADM mostrar
+    previews: dict[str, str] = {}  # scope -> HTML, sempre preenchido (não só dry-run)
 
 
 class AnomalyRowDTO(BaseModel):

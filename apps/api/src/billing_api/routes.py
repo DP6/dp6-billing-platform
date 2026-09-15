@@ -48,14 +48,20 @@ def _has_scope(service: str | None, environment: str | None, app: str | None, pr
     return bool(service or environment or app or project)
 
 
-def _effective_budget_brl(project: str | None) -> float:
-    """Budget por escopo (aba ADM, Firestore) com fallback pra constante
-    fixa de Settings -- fica ao vivo (sem o lag do cron diário do Dataform),
-    e nenhuma view .sqlx precisa mudar pra isso funcionar."""
+def _effective_budget_brl(project: str | None) -> float | None:
+    """Budget por escopo (aba ADM, Firestore) -- fica ao vivo (sem o lag do
+    cron diário do Dataform), e nenhuma view .sqlx precisa mudar pra isso
+    funcionar. None quando NINGUÉM cadastrou orçamento pra esse escopo ainda
+    -- não cai mais num fallback fixo (S.monthly_budget_brl), que fingia um
+    orçamento de R$20 pra qualquer projeto/conta sem cadastro real. Os
+    callers tratam None como "sem orçamento": os %/thresholds zeram (todo
+    `if budget else 0.0` já trata None como falsy) e o front mostra "sem
+    orçamento cadastrado" em vez de um número inventado.
+    Em modo mock mantém a constante -- é dado de demonstração, não dado real."""
     if mock_active():
         return S.monthly_budget_brl
     cfg = fsdb.get_budget_or_none(project or fsdb.ACCOUNT_SCOPE)
-    return float(cfg["budget_brl"]) if cfg else S.monthly_budget_brl
+    return float(cfg["budget_brl"]) if cfg else None
 
 
 # ---------------------------------------------------------------- meta / dimensions / scorecard
@@ -408,11 +414,12 @@ def budget(
 ) -> m.BudgetDTO:
     sc = scorecard(service, environment, app, project)
     bud = _effective_budget_brl(project)
-    thresholds = [m.ThresholdDTO(pct=p, value_brl=bud * p) for p in S.budget_thresholds]
+    thresholds = [m.ThresholdDTO(pct=p, value_brl=bud * p) for p in S.budget_thresholds] if bud else []
     breach: str | None = None
     # rpt_budget_daily não tem project_id (é só conta inteira) -- comparar a
     # curva dela contra o budget de 1 projeto não faz sentido, então pula.
-    if mock_active() or project:
+    # Sem orçamento cadastrado (bud is None) também pula -- nada pra estourar.
+    if mock_active() or project or bud is None:
         rows = []
     else:
         rows = query(f"SELECT usage_date, net_cost_cum_brl FROM `{RPT}.rpt_budget_daily` ORDER BY usage_date")
@@ -426,7 +433,7 @@ def budget(
         run_rate_eom_brl=sc.run_rate_eom_brl,
         budget_used_pct=sc.budget_used_pct,
         run_rate_vs_budget_pct=sc.run_rate_vs_budget_pct,
-        headroom_brl=bud - sc.run_rate_eom_brl,
+        headroom_brl=(bud - sc.run_rate_eom_brl) if bud is not None else None,
         projected_breach_date=breach,
         thresholds=thresholds,
     )
