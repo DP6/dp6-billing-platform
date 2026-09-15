@@ -191,6 +191,39 @@ function BudgetsPanel({ budgets, dims, bump }: { budgets: BudgetConfig[]; dims: 
     bump();
   };
 
+  // "marcar/desmarcar todos" dos 2 toggles de sincronização -- PUT .../sync-flags
+  // sempre grava os 2 campos juntos, então o bulk preserva o outro campo de
+  // cada linha (só muda o que o botão clicado se refere).
+  const bulkSyncFlags = useMutationState<void>();
+  const setAllBudgetSync = async (value: boolean) => {
+    await bulkSyncFlags.run(async () => {
+      await Promise.all(
+        projectBudgets.filter((b) => b.budget_source_gcp !== value).map((b) =>
+          apiPut<BudgetConfig>(`/adm/budgets/${encodeURIComponent(b.scope)}/sync-flags`, {
+            budget_source_gcp: value,
+            emails_source_gcp: b.emails_source_gcp,
+          }),
+        ),
+      );
+    });
+    bump();
+  };
+  const setAllEmailsSync = async (value: boolean) => {
+    await bulkSyncFlags.run(async () => {
+      await Promise.all(
+        projectBudgets.filter((b) => b.emails_source_gcp !== value).map((b) =>
+          apiPut<BudgetConfig>(`/adm/budgets/${encodeURIComponent(b.scope)}/sync-flags`, {
+            budget_source_gcp: b.budget_source_gcp,
+            emails_source_gcp: value,
+          }),
+        ),
+      );
+    });
+    bump();
+  };
+  const allBudgetSynced = projectBudgets.length > 0 && projectBudgets.every((b) => b.budget_source_gcp);
+  const allEmailsSynced = projectBudgets.length > 0 && projectBudgets.every((b) => b.emails_source_gcp);
+
   const cols: DataTableCol<BudgetConfig>[] = [
     { key: "project", label: "Projeto", render: (r) => r.project_name ?? r.scope, sort: (r) => r.project_name ?? r.scope },
     { key: "budget", label: "Orçamento", num: true, render: (r) => brl(r.budget_brl), sort: (r) => r.budget_brl },
@@ -248,6 +281,44 @@ function BudgetsPanel({ budgets, dims, bump }: { budgets: BudgetConfig[]; dims: 
 
         <div style={{ paddingTop: 16, borderTop: "1px solid var(--border)" }}>
           <span style={{ ...fieldLabel, display: "block", marginBottom: 8 }}>Por projeto</span>
+          {projectBudgets.length > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
+              <span style={{ fontSize: 12, color: "var(--muted-foreground)" }}>Orçamento do GCP:</span>
+              <button
+                type="button"
+                onClick={() => setAllBudgetSync(true)}
+                disabled={bulkSyncFlags.loading || allBudgetSynced}
+                style={{ ...btnGhostStyle, ...btnSmallStyle }}
+              >
+                selecionar todos
+              </button>
+              <button
+                type="button"
+                onClick={() => setAllBudgetSync(false)}
+                disabled={bulkSyncFlags.loading}
+                style={{ ...btnGhostStyle, ...btnSmallStyle }}
+              >
+                desmarcar todos
+              </button>
+              <span style={{ fontSize: 12, color: "var(--muted-foreground)", marginLeft: 12 }}>E-mails do GCP:</span>
+              <button
+                type="button"
+                onClick={() => setAllEmailsSync(true)}
+                disabled={bulkSyncFlags.loading || allEmailsSynced}
+                style={{ ...btnGhostStyle, ...btnSmallStyle }}
+              >
+                selecionar todos
+              </button>
+              <button
+                type="button"
+                onClick={() => setAllEmailsSync(false)}
+                disabled={bulkSyncFlags.loading}
+                style={{ ...btnGhostStyle, ...btnSmallStyle }}
+              >
+                desmarcar todos
+              </button>
+            </div>
+          )}
           {projectBudgets.length > 0 && <DataTable cols={cols} rows={projectBudgets} defaultPageSize={10} />}
 
           <div style={{ marginTop: projectBudgets.length > 0 ? 16 : 0 }}>
