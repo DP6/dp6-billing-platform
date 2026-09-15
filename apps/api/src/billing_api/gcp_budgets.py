@@ -45,6 +45,16 @@ def _session():
     return AuthorizedSession(creds)
 
 
+def _raise_for_status_verbose(resp) -> None:
+    """resp.raise_for_status() sozinho só loga a linha de status ("403
+    Forbidden"), sem o corpo -- e é exatamente o corpo que traz o motivo real
+    (PERMISSION_DENIED vs API não habilitada vs etc.) que o Google sempre
+    devolve em JSON. Loga o corpo antes de propagar."""
+    if resp.status_code >= 400:
+        log.error("GCP API %s -> %s: %s", resp.url, resp.status_code, resp.text[:2000])
+    resp.raise_for_status()
+
+
 def _money_to_float(money: dict | None) -> float | None:
     """Money {currencyCode, units, nanos} -> float. None se ausente (budget
     usa lastPeriodAmount em vez de specifiedAmount -- sem valor fixo pra
@@ -76,7 +86,7 @@ def _resolve_email_channels(session, channel_names: list[str]) -> list[str]:
     for name in channel_names:
         try:
             resp = session.get(_CHANNEL_URL.format(name=name), timeout=10)
-            resp.raise_for_status()
+            _raise_for_status_verbose(resp)
             ch = resp.json()
             if ch.get("type") == "email":
                 email = (ch.get("labels") or {}).get("email_address")
@@ -103,7 +113,7 @@ def list_gcp_budgets() -> list[dict[str, Any]]:
         if page_token:
             params["pageToken"] = page_token
         resp = session.get(_BUDGETS_URL.format(account=s.billing_account_id), params=params, timeout=20)
-        resp.raise_for_status()
+        _raise_for_status_verbose(resp)
         data = resp.json()
         budgets.extend(data.get("budgets", []))
         page_token = data.get("nextPageToken")
