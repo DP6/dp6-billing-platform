@@ -2,7 +2,7 @@ config {
   type: "view",
   schema: dataform.projectConfig.vars.reporting_dataset,
   tags: ["billing_platform"],
-  description: "Historico mensal + previsao linear dos proximos 3 meses com faixa, conta inteira. Historico curto -> faixa larga de proposito; recalibra sozinha conforme cresce. Sem project_id de proposito — regressao por projeto exigiria historico proprio por projeto (ainda mais curto); revisitar so depois da Fase 1 confirmar volume suficiente por projeto."
+  description: "Historico mensal + previsao linear dos proximos 3 meses com faixa, conta inteira. Faixa calculada a partir do desvio-padrao dos residuos do proprio ajuste (erro do modelo), nao da dispersao bruta do historico. Historico curto -> faixa larga de proposito; recalibra sozinha conforme cresce. Sem project_id de proposito — regressao por projeto exigiria historico proprio por projeto (ainda mais curto); revisitar so depois da Fase 1 confirmar volume suficiente por projeto."
 }
 
 WITH hist AS (
@@ -18,15 +18,24 @@ WITH hist AS (
 idx AS (
   SELECT *, ROW_NUMBER() OVER (ORDER BY month_date) AS x FROM hist
 ),
-fit AS (
+coef AS (
   SELECT
     AVG(x) AS ax, AVG(net_cost_brl) AS ay,
     SAFE_DIVIDE(SUM((x - (SELECT AVG(x) FROM idx)) * (net_cost_brl - (SELECT AVG(net_cost_brl) FROM idx))),
                NULLIF(SUM(POW(x - (SELECT AVG(x) FROM idx), 2)), 0)) AS slope,
-    STDDEV_SAMP(net_cost_brl) AS sd,
     MAX(x) AS max_x,
     MAX(month_date) AS max_month
   FROM idx
+),
+resid AS (
+  -- erro do modelo: valor real menos valor previsto pela propria reta em cada ponto historico
+  SELECT i.net_cost_brl - (c.ay + c.slope * (i.x - c.ax)) AS residual
+  FROM idx i, coef c
+),
+fit AS (
+  SELECT c.ax, c.ay, c.slope, c.max_x, c.max_month, STDDEV_SAMP(r.residual) AS sd
+  FROM coef c, resid r
+  GROUP BY 1, 2, 3, 4, 5
 ),
 future AS (
   SELECT n AS h, DATE_ADD((SELECT max_month FROM fit), INTERVAL n MONTH) AS month_date
