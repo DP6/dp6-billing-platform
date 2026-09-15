@@ -208,12 +208,17 @@ export interface BudgetConfig {
   project_name: string | null;
   budget_brl: number;
   emails: string[];
+  // subconjunto de `emails` que veio do GCP na última sincronização — só
+  // pra diferenciar "sincronizado"/"manual" na lista (badge), não muda o
+  // que o relatório manda (isso é sempre todo endereço em `emails`).
+  gcp_emails: string[];
   // controla só o disparo AUTOMÁTICO de segunda — "enviar agora" ignora essa
   // flag de propósito (é sempre um disparo explícito).
   report_enabled: boolean;
-  // true = campo sincronizado do GCP Billing Budgets (gcp_budgets.py), UI
-  // trava a edição manual daquele campo — desligar assume controle manual
-  // permanente (sync futura nunca mais mexe nele).
+  // true = campo sincronizado do GCP Billing Budgets (gcp_budgets.py).
+  // budget_brl é sobrescrito a cada sync; emails só ganha união (nunca
+  // remove um e-mail cadastrado à mão). Os campos continuam editáveis
+  // manualmente com o toggle ligado — a próxima sync pode mexer de novo.
   budget_source_gcp: boolean;
   emails_source_gcp: boolean;
   gcp_budget_name: string | null;

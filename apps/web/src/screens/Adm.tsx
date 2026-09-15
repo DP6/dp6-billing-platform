@@ -108,6 +108,38 @@ function SyncToggles({ cfg, bump }: { cfg: BudgetConfig; bump: () => void }) {
   );
 }
 
+/** Lista de e-mails com uma tag pequena nos que vieram do GCP (gcp_emails) —
+ *  só diferenciação visual, o relatório manda pra TODO endereço em `emails`
+ *  do mesmo jeito, sincronizado ou não. */
+function EmailBadgeList({ emails, gcpEmails }: { emails: string[]; gcpEmails: string[] }) {
+  if (emails.length === 0) return <>—</>;
+  const gcpSet = new Set(gcpEmails);
+  return (
+    <>
+      {emails.map((e, i) => (
+        <span key={e}>
+          {i > 0 && ", "}
+          {e}
+          {gcpSet.has(e) && (
+            <span
+              title="Sincronizado do GCP"
+              style={{
+                fontSize: 9,
+                fontWeight: 600,
+                letterSpacing: ".04em",
+                color: "var(--status-ok-foreground)",
+                marginLeft: 3,
+              }}
+            >
+              GCP
+            </span>
+          )}
+        </span>
+      ))}
+    </>
+  );
+}
+
 /** Form de cadastro/edição de 1 budget (conta inteira, ou 1 projeto) — só
  *  budget_brl/emails. O toggle do relatório semanal fica só na tabela do
  *  painel de relatório (report-enabled), nunca reenviado por aqui: editar o
@@ -143,8 +175,8 @@ function BudgetForm({
     onSaved();
   };
 
-  const budgetLocked = initial?.budget_source_gcp ?? false;
-  const emailsLocked = initial?.emails_source_gcp ?? false;
+  const budgetSynced = initial?.budget_source_gcp ?? false;
+  const emailsSynced = initial?.emails_source_gcp ?? false;
 
   return (
     <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: "10px 16px" }}>
@@ -160,10 +192,11 @@ function BudgetForm({
           min="0"
           value={budgetBrl}
           onChange={(e) => setBudgetBrl(e.target.value)}
-          disabled={budgetLocked}
-          style={{ ...inputStyle, width: 140, opacity: budgetLocked ? 0.6 : 1 }}
+          style={{ ...inputStyle, width: 140 }}
         />
-        {budgetLocked && <span style={syncBadgeStyle}>sincronizado do GCP — desligue o toggle pra editar</span>}
+        {budgetSynced && (
+          <span style={syncBadgeStyle}>sincronizado do GCP — uma sincronização futura pode sobrescrever esse valor</span>
+        )}
       </Field>
       <Field label="E-mails responsáveis (grupo e/ou avulso, separados por vírgula)">
         <input
@@ -171,10 +204,22 @@ function BudgetForm({
           value={emails}
           onChange={(e) => setEmails(e.target.value)}
           placeholder="time-x@dp6.com.br, fulano@dp6.com.br"
-          disabled={emailsLocked}
-          style={{ ...inputStyle, minWidth: 320, opacity: emailsLocked ? 0.6 : 1 }}
+          style={{ ...inputStyle, minWidth: 320 }}
         />
-        {emailsLocked && <span style={syncBadgeStyle}>sincronizado do GCP — desligue o toggle pra editar</span>}
+        {emailsSynced ? (
+          <span style={syncBadgeStyle}>
+            sincronizado do GCP — sincronização futura só ACRESCENTA e-mail novo do GCP, nunca remove o que está aqui
+          </span>
+        ) : (
+          initial && initial.gcp_emails.length > 0 && (
+            <span style={syncBadgeStyle}>toggle desligado — e-mails do GCP não são mais adicionados automaticamente</span>
+          )
+        )}
+        {initial && initial.emails.length > 0 && (
+          <div style={{ fontSize: 11.5, color: "var(--muted-foreground)", marginTop: 3 }}>
+            <EmailBadgeList emails={initial.emails} gcpEmails={initial.gcp_emails} />
+          </div>
+        )}
       </Field>
       <button type="button" onClick={save} disabled={loading} style={btnStyle}>
         {loading ? "Salvando…" : "Salvar"}
@@ -258,7 +303,7 @@ function BudgetsPanel({ budgets, dims, bump }: { budgets: BudgetConfig[]; dims: 
   const cols: DataTableCol<BudgetConfig>[] = [
     { key: "project", label: "Projeto", render: (r) => r.project_name ?? r.scope, sort: (r) => r.project_name ?? r.scope },
     { key: "budget", label: "Orçamento", num: true, render: (r) => brl(r.budget_brl), sort: (r) => r.budget_brl },
-    { key: "emails", label: "E-mails", render: (r) => r.emails.join(", ") || "—" },
+    { key: "emails", label: "E-mails", render: (r) => <EmailBadgeList emails={r.emails} gcpEmails={r.gcp_emails} /> },
     { key: "sync", label: "Sincronizar do GCP", render: (r) => <SyncToggles cfg={r} bump={bump} /> },
     {
       key: "actions",
@@ -370,8 +415,6 @@ function BudgetsPanel({ budgets, dims, bump }: { budgets: BudgetConfig[]; dims: 
               <>
                 <div style={{ fontSize: 12.5, color: "var(--muted-foreground)", marginBottom: 8 }}>
                   Editando {editingRow?.project_name ?? editingProject?.project_name ?? editing}
-                  {(editingRow?.budget_source_gcp || editingRow?.emails_source_gcp) &&
-                    " — desmarque os toggles de sincronização desse projeto na tabela acima pra liberar os campos travados."}
                 </div>
                 <BudgetForm
                   key={editing}
@@ -487,7 +530,7 @@ function WeeklyReportPanel({ budgets, bump }: { budgets: BudgetConfig[]; bump: (
 
   const cols: DataTableCol<BudgetConfig>[] = [
     { key: "scope", label: "Escopo", render: (r) => scopeLabel(r), sort: (r) => scopeLabel(r) },
-    { key: "emails", label: "E-mails", render: (r) => r.emails.join(", ") || "—" },
+    { key: "emails", label: "E-mails", render: (r) => <EmailBadgeList emails={r.emails} gcpEmails={r.gcp_emails} /> },
     {
       key: "enabled",
       label: "Ativado",

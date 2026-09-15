@@ -135,9 +135,22 @@ def sync_from_gcp(
     Budgets API. budget_brl/emails None = toggle correspondente desligado,
     não mexe naquele campo (só atualiza gcp_budget_name/gcp_synced_at pro
     bookkeeping). Doc que ainda não existe é criado com os 2 toggles
-    LIGADOS e os valores do GCP -- é a "adoção automática" na 1ª descoberta."""
+    LIGADOS e os valores do GCP -- é a "adoção automática" na 1ª descoberta.
+
+    budget_brl é SOBRESCRITO (é o número oficial do GCP, não tem por que ter
+    2 fontes de verdade divergentes -- editar manualmente com o toggle ligado
+    ainda funciona, só que a próxima sincronização volta a bater por cima).
+
+    emails é so ACRESCENTADO (união, nunca remove) -- e-mail cadastrado à mão
+    (grupo interno, pessoa avulsa) que não é canal de notificação nenhum do
+    GCP nunca é apagado por uma sincronização. gcp_emails guarda À PARTE quais
+    e-mails vieram do GCP na última sincronização, só pra UI diferenciar
+    "sincronizado" de "manual" na lista -- não é usado pra decidir o que
+    mandar no relatório (isso continua sendo TODO endereço em `emails`)."""
     ref = _get_client().collection(_BUDGETS).document(scope)
-    is_new = not ref.get().exists
+    snap = ref.get()
+    is_new = not snap.exists
+    current = snap.to_dict() or {} if snap.exists else {}
 
     doc: dict[str, Any] = {"gcp_budget_name": gcp_budget_name, "gcp_synced_at": _now()}
     if project_name is not None:
@@ -148,6 +161,7 @@ def sync_from_gcp(
         doc["emails_source_gcp"] = True
         doc["budget_brl"] = budget_brl if budget_brl is not None else 0.0
         doc["emails"] = emails or []
+        doc["gcp_emails"] = emails or []
         doc["report_enabled"] = False
         doc["updated_at"] = _now()
         doc["updated_by"] = "gcp-budgets-sync"
@@ -155,7 +169,12 @@ def sync_from_gcp(
         if budget_brl is not None:
             doc["budget_brl"] = budget_brl
         if emails is not None:
-            doc["emails"] = emails
+            merged = list(current.get("emails") or [])
+            for e in emails:
+                if e not in merged:
+                    merged.append(e)
+            doc["emails"] = merged
+            doc["gcp_emails"] = emails
 
     ref.set(doc, merge=True)
     out = ref.get().to_dict() or {}
