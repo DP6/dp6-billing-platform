@@ -78,6 +78,11 @@ class Settings(BaseSettings):
     # (require_scheduler em auth.py). "" em dev -- scheduler so existe em prod.
     scheduler_sa_email: str = ""
 
+    # conta de faturamento (Billing Budgets API, gcp_budgets.py) -- hierarquia
+    # SEPARADA do projeto GCP, roles/billing.viewer nao entra no nosso
+    # Terraform (pedido externo pra quem administra a billing account).
+    billing_account_id: str = "008012-F93445-DFD798"
+
     # escape-hatch SO pra dev local sem sessao de IAP de verdade -- nunca
     # setado por Terraform (variavel de .env local). Com isso true, todo
     # caller vira admin (bootstrap email), sem checar JWT/grupo nenhum.

@@ -211,8 +211,21 @@ export interface BudgetConfig {
   // controla só o disparo AUTOMÁTICO de segunda — "enviar agora" ignora essa
   // flag de propósito (é sempre um disparo explícito).
   report_enabled: boolean;
+  // true = campo sincronizado do GCP Billing Budgets (gcp_budgets.py), UI
+  // trava a edição manual daquele campo — desligar assume controle manual
+  // permanente (sync futura nunca mais mexe nele).
+  budget_source_gcp: boolean;
+  emails_source_gcp: boolean;
+  gcp_budget_name: string | null;
+  gcp_synced_at: string | null;
   updated_at: string | null;
   updated_by: string | null;
+}
+export interface SyncBudgetsResult {
+  scopes_created: string[];
+  scopes_updated: string[];
+  scopes_skipped: string[]; // toggles desligados -- bookkeeping atualizado, valor não
+  scopes_failed: string[];
 }
 export interface WeeklyReportConfig {
   // bookkeeping global do disparo automático — o toggle em si é por budget

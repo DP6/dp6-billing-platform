@@ -42,3 +42,26 @@ resource "google_cloud_scheduler_job" "weekly_cost_report" {
     }
   }
 }
+
+# Sincronizacao diaria do budget/e-mail do GCP Billing Budgets pra aba ADM
+# (gcp_budgets.py) -- mesma SA/binding IAP do job semanal acima, so endpoint
+# diferente. Roda antes do e-mail de segunda (08:00) pra ele sair com dado
+# fresco. Bloqueado por roles/billing.viewer na billing account ate a TI
+# conceder (pedido externo, ver plano da feature) -- o endpoint ja devolve
+# 503 honesto enquanto isso, nao quebra silenciosamente.
+resource "google_cloud_scheduler_job" "gcp_budgets_daily_sync" {
+  project   = var.project_id
+  region    = var.region
+  name      = "billing-platform-gcp-budgets-sync"
+  schedule  = "0 5 * * *" # todo dia, 05:00
+  time_zone = "America/Sao_Paulo"
+
+  http_target {
+    http_method = "POST"
+    uri         = "${module.api.uri}/api/internal/gcp-budgets/scheduled-run"
+    oidc_token {
+      service_account_email = google_service_account.weekly_report_scheduler.email
+      audience              = module.api.uri
+    }
+  }
+}

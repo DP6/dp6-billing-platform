@@ -10,7 +10,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from . import email_report
+from . import email_report, gcp_budgets
 from . import firestore as fsdb
 from . import models as m
 from .auth import get_caller_email, is_admin_email, require_admin, require_scheduler
@@ -69,6 +69,21 @@ def set_report_enabled(
     return m.BudgetConfigDTO(**row)
 
 
+@router.put("/adm/budgets/{scope}/sync-flags", response_model=m.BudgetConfigDTO)
+def set_sync_flags(
+    scope: str, body: m.SyncFlagsUpdateDTO, actor: str = Depends(require_admin)
+) -> m.BudgetConfigDTO:
+    """Liga/desliga os 2 toggles de sincronização do GCP Billing Budgets --
+    não mexe em budget_brl/emails aqui (isso acontece na próxima sync)."""
+    if mock_active():
+        return m.BudgetConfigDTO(
+            scope=scope, budget_brl=20.0, emails=[],
+            budget_source_gcp=body.budget_source_gcp, emails_source_gcp=body.emails_source_gcp,
+        )
+    row = _fs_or_503(fsdb.set_sync_flags, scope, body.budget_source_gcp, body.emails_source_gcp, actor)
+    return m.BudgetConfigDTO(**row)
+
+
 @router.delete("/adm/budgets/{scope}", status_code=204)
 def delete_budget(scope: str, _: str = Depends(require_admin)) -> None:
     if mock_active():
@@ -98,3 +113,36 @@ def scheduled_run(_: str = Depends(require_scheduler)) -> m.SendNowResultDTO:
     """Chamado só pelo Cloud Scheduler (segunda 08:00, prod) -- manda só pros
     budgets com report_enabled=true."""
     return email_report.run_weekly_report(respect_toggle=True)
+
+
+def _gcp_budgets_or_503(fn, *args, **kwargs):
+    """Mesmo espírito de _fs_or_503 -- erro lendo a Billing Budgets/Monitoring
+    API (ex. roles/billing.viewer ainda não concedido) vira 503 honesto, não
+    500 cru nem sucesso silencioso."""
+    try:
+        return fn(*args, **kwargs)
+    except Exception as exc:
+        log.exception("GCP Billing Budgets/Monitoring API indisponível")
+        raise HTTPException(
+            503,
+            {
+                "code": "gcp_budgets_unavailable",
+                "message": "Não foi possível ler os budgets do GCP (grant pendente ou API fora do ar).",
+            },
+        ) from exc
+
+
+@router.post("/adm/gcp-budgets/sync-now", response_model=m.SyncBudgetsResultDTO)
+def gcp_budgets_sync_now(
+    body: m.SendNowRequestDTO | None = None, _: str = Depends(require_admin)
+) -> m.SyncBudgetsResultDTO:
+    """Manual (1 escopo, via body.scope, ou todos sem body) -- reaproveita o
+    mesmo DTO de request do envio manual do relatório (só tem o campo scope)."""
+    scope = body.scope if body else None
+    return _gcp_budgets_or_503(gcp_budgets.sync_all, scope)
+
+
+@router.post("/internal/gcp-budgets/scheduled-run", response_model=m.SyncBudgetsResultDTO)
+def gcp_budgets_scheduled_run(_: str = Depends(require_scheduler)) -> m.SyncBudgetsResultDTO:
+    """Chamado só pelo Cloud Scheduler (1x/dia, prod)."""
+    return _gcp_budgets_or_503(gcp_budgets.sync_all)
