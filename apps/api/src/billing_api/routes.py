@@ -351,10 +351,20 @@ def cost_by_project(
                 for pid, v in fx.PROJECTS]
     where, params = _scope(service, environment, app)
     rows = query(f"""
-        SELECT project_id, ANY_VALUE(project_name) project_name, SUM(net_cost_brl) net_cost_brl
+        SELECT IFNULL(project_id, '(sem projeto)') AS project_id,
+               IFNULL(ANY_VALUE(project_name), '(sem projeto)') AS project_name,
+               SUM(net_cost_brl) net_cost_brl
         FROM `{RPT}.rpt_cost_daily` WHERE usage_date BETWEEN @from AND @to {where}
         GROUP BY project_id ORDER BY net_cost_brl DESC
     """, {**params, "from": from_, "to": to})
+    # project_id vem NULL pra linhas de ajuste de fatura (service_description
+    # "Invoice", cost_type rounding_error/tax) -- correcao/imposto no nivel da
+    # CONTA, nunca amarrado a um recurso/projeto. Sem o IFNULL acima,
+    # ProjectCostDTO (campos obrigatorios) quebrava com 422 assim que a janela
+    # de datas incluia uma dessas linhas (achado real: painel em prod, janela
+    # 17/06-14/09). "(sem projeto)" segue o mesmo padrao de "(sem label)"/
+    # "(não-alocado)" usado no resto do app -- nunca esconde o dado, só nomeia
+    # o que não tem dono.
     total = sum(r["net_cost_brl"] for r in rows) or 1.0
     return [m.ProjectCostDTO(project_id=r["project_id"], project_name=r["project_name"],
                              net_cost_brl=r["net_cost_brl"], pct_of_total=r["net_cost_brl"] / total)
