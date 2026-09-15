@@ -129,6 +129,28 @@ def _resolve_email_channels(session, channel_names: list[str]) -> list[str]:
     return emails
 
 
+def _resolve_project_id(session, raw: str) -> str:
+    """budgetFilter.projects vem no formato "projects/{project}" -- {project}
+    às vezes é o NÚMERO do projeto, não o ID em string (inconsistência real
+    da API, achada em prod: 1 budget deu o id "dp6-brasil", outro deu só o
+    número "86068631905"). O resto do painel (dims.projects, FilterBar,
+    rpt_cost_daily) só conhece o ID em string -- usar o número como scope
+    aqui quebra a correlação com a Visão Geral (o orçamento fica "invisível"
+    pro filtro de projeto, mesmo existindo no Firestore). Resolve pro ID
+    canônico via Resource Manager quando `raw` é só dígitos; se a resolução
+    falhar (sem acesso ainda), mantém o número mesmo -- não trava a
+    sincronização, só fica com essa mesma limitação até o acesso existir."""
+    if not raw.isdigit():
+        return raw
+    try:
+        resp = session.get(_PROJECT_URL.format(project_id=raw), timeout=10)
+        _raise_for_status_verbose(resp)
+        return resp.json().get("projectId") or raw
+    except Exception:
+        log.warning("Não foi possível resolver o project_id canônico do número %s -- mantendo o número como escopo", raw)
+        return raw
+
+
 def list_gcp_budgets() -> list[dict[str, Any]]:
     """1 item por escopo (project_id, ou ACCOUNT_SCOPE pro budget sem filtro
     de projeto) descoberto nos budgets do GCP. Um budget pode listar vários
@@ -164,7 +186,10 @@ def list_gcp_budgets() -> list[dict[str, Any]]:
         channels = (b.get("notificationsRule") or {}).get("monitoringNotificationChannels") or []
         emails = _resolve_email_channels(session, channels)
 
-        project_ids = [p.split("/")[-1] for p in (b.get("budgetFilter") or {}).get("projects") or []]
+        project_ids = [
+            _resolve_project_id(session, p.split("/")[-1])
+            for p in (b.get("budgetFilter") or {}).get("projects") or []
+        ]
         scopes = project_ids if project_ids else [fsdb.ACCOUNT_SCOPE]
 
         for scope in scopes:
