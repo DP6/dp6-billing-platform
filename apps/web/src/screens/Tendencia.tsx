@@ -1,9 +1,10 @@
 import { MomBars, type MomBarPoint } from "../charts/MomBars";
 import { PaceChart, type PacePoint } from "../charts/PaceChart";
 import { TemporalChart } from "../charts/TemporalChart";
-import { LoadingOrError, PageHeader, Panel } from "../components/ui";
+import { DrillBar, LoadingOrError, PageHeader, Panel } from "../components/ui";
 import { useApi } from "../lib/api";
 import { monthLabel } from "../lib/format";
+import { DRILL_LABEL, type DrillDimension, useDrillFilters } from "../lib/useDrillFilters";
 import { scopeParams, useFilters } from "../lib/useFilters";
 import type { CostSeriesPoint, DailyPoint, MonthlyServicePoint, ReconRow, Scorecard } from "../types";
 
@@ -63,11 +64,20 @@ function paceData(daily: DailyPoint[] | undefined): PacePoint[] {
 
 export function Tendencia() {
   const [f] = useFilters();
-  const scope = scopeParams(f);
+  const { drill, toggle, clear } = useDrillFilters(f);
+  // scope = filtros do topo (persistentes) + drill por clique (local da tela) --
+  // mesclados porque o clique deve refiltrar a página inteira.
+  const scope = { ...scopeParams(f), ...drill };
 
   const sc = useApi<Scorecard>("/scorecard", scope);
-  const monthly = useApi<MonthlyServicePoint[]>("/cost/monthly", { environment: f.environment, app: f.app });
+  const monthly = useApi<MonthlyServicePoint[]>("/cost/monthly", { environment: scope.environment, app: scope.app });
   const recon = useApi<ReconRow[]>("/reconciliation", scope);
+
+  const drillEntries = (Object.keys(drill) as DrillDimension[]).map((dim) => ({
+    dim,
+    dimLabel: DRILL_LABEL[dim],
+    value: drill[dim] as string,
+  }));
 
   // janela própria da tela: início do mês anterior até hoje (não o Período global).
   const today = new Date();
@@ -85,6 +95,7 @@ export function Tendencia() {
         title="Tendência"
         desc="Empilhado mensal por serviço, variação mês a mês com run-rate, ritmo acumulado do mês corrente vs. anterior."
       />
+      <DrillBar entries={drillEntries} onRemove={(dim) => clear(dim as DrillDimension)} onClearAll={() => clear()} />
 
       <Panel title="Custo líquido mensal por serviço" cap="Empilhado por invoice_month · ≤5 serviços + Outros.">
         <LoadingOrError loading={monthly.loading} error={monthly.error} />
@@ -94,6 +105,8 @@ export function Tendencia() {
           groupBy="service"
           onChange={() => {}}
           controls={false}
+          selected={drill.service}
+          onSelect={(v) => toggle("service", v)}
         />
       </Panel>
 

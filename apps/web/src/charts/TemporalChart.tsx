@@ -100,6 +100,8 @@ export function TemporalChart({
   onChange,
   height = 260,
   controls = true,
+  selected,
+  onSelect,
 }: {
   data: CostSeriesPoint[] | undefined;
   grain: Grain;
@@ -109,6 +111,12 @@ export function TemporalChart({
   /** false esconde os seletores de Granularidade/Empilhar por — usado quando a tela já
    *  fixa grain+groupBy (ex. Tendência: sempre mês/serviço, sem controle do usuário). */
   controls?: boolean;
+  /** valor da série (dimensão = groupBy) atualmente selecionada via clique — destaca
+   *  essa série e esmaece as demais. */
+  selected?: string;
+  /** clique numa série real (nunca "Outros"/"total", que não são valores de verdade) --
+   *  drill-down por gráfico, ver useDrillFilters. */
+  onSelect?: (value: string) => void;
 }) {
   const { rows, keys } = data ? shape(data, grain) : { rows: [], keys: [] };
   const single = keys.length === 1 && keys[0] === "total";
@@ -208,19 +216,27 @@ export function TemporalChart({
               }}
             />
             {!single && <Legend wrapperStyle={{ fontSize: 12 }} />}
-            {(single ? ["total"] : keys).map((k, i) => (
-              <Bar
-                key={k}
-                yAxisId="bar"
-                dataKey={k}
-                stackId="s"
-                name={single ? "líquido" : k}
-                fill={barColor(i, k)}
-                stroke="var(--card)"
-                strokeWidth={2}
-                maxBarSize={34}
-              />
-            ))}
+            {(single ? ["total"] : keys).map((k, i) => {
+              // "Outros" (cauda agregada) e "total" (sem agrupamento) não são valores de
+              // dimensão reais -- não clicáveis.
+              const clickable = !single && k !== "Outros" && !!onSelect;
+              return (
+                <Bar
+                  key={k}
+                  yAxisId="bar"
+                  dataKey={k}
+                  stackId="s"
+                  name={single ? "líquido" : k}
+                  fill={barColor(i, k)}
+                  fillOpacity={selected && selected !== k ? 0.35 : 1}
+                  stroke="var(--card)"
+                  strokeWidth={2}
+                  maxBarSize={34}
+                  onClick={clickable ? () => onSelect!(k) : undefined}
+                  cursor={clickable ? "pointer" : undefined}
+                />
+              );
+            })}
             <Line
               yAxisId="cum"
               type="monotone"

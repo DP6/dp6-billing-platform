@@ -1,9 +1,10 @@
-import { HBars } from "../charts/HBars";
+import { HBars, type HBarRow } from "../charts/HBars";
 import { PercentLines } from "../charts/PercentLines";
-import { Chip, DataTable, LoadingOrError, MetricGrid, MetricTile, PageHeader, Panel, StatusBadge } from "../components/ui";
+import { Chip, DataTable, DrillBar, LoadingOrError, MetricGrid, MetricTile, PageHeader, Panel, StatusBadge } from "../components/ui";
 import { useApi } from "../lib/api";
 import { brl, pctPlain, dayLabel } from "../lib/format";
 import { chartColor } from "../charts/palette";
+import { DRILL_LABEL, type DrillDimension, useDrillFilters } from "../lib/useDrillFilters";
 import { filterParams, resolveWindow, scopeParams, useFilters } from "../lib/useFilters";
 import type { AppAllocation, ChargebackReadiness, ComponentLabelCoverage, CoverageWeek, EnvAllocation, UnlabeledResource } from "../types";
 
@@ -16,12 +17,26 @@ const groupEyebrow = {
   display: "block",
 };
 
-function AllocBars({ title, rows, unallocated }: { title: string; rows: { label: string; value: number }[]; unallocated: number }) {
-  const all = [...rows, { label: "(não-alocado)", value: unallocated }];
+function AllocBars({
+  title,
+  rows,
+  unallocated,
+  dimension,
+  selected,
+  onSelect,
+}: {
+  title: string;
+  rows: { label: string; value: number }[];
+  unallocated: number;
+  dimension: DrillDimension;
+  selected?: string;
+  onSelect: (dim: DrillDimension, value: string) => void;
+}) {
+  const all: HBarRow[] = [...rows, { label: "(não-alocado)", value: unallocated, disabled: true }];
   return (
     <div>
       <span style={groupEyebrow}>{title}</span>
-      <HBars rows={all} />
+      <HBars rows={all} selected={selected} onSelect={(v) => onSelect(dimension, v)} />
     </div>
   );
 }
@@ -65,7 +80,11 @@ const statusTone = { ok: "ok", partial: "warn", missing: "error" } as const;
 
 export function Alocacao() {
   const [f] = useFilters();
-  const scope = scopeParams(f);
+  const { drill, toggle, clear } = useDrillFilters(f);
+  // scope/fp = filtros do topo (persistentes) + drill por clique (local da tela) --
+  // mesclados porque o clique deve refiltrar a página inteira.
+  const scope = { ...scopeParams(f), ...drill };
+  const fp = { ...filterParams(f), ...drill };
   const win = resolveWindow(f);
 
   const coverageByComponent = useApi<ComponentLabelCoverage[]>("/allocation/coverage/by-component");
@@ -73,11 +92,16 @@ export function Alocacao() {
   const weekly = useApi<CoverageWeek[]>("/allocation/coverage/weekly", scope);
   // by-app/by-env agora respeitam Período + Serviço/Ambiente/Projeto do FilterBar — leem
   // fct_billing_cost_daily por usage_date, não mais um agregado mensal fixo.
-  const byApp = useApi<AppAllocation>("/allocation/by-app", filterParams(f));
-  const byEnv = useApi<EnvAllocation>("/allocation/by-env", filterParams(f));
+  const byApp = useApi<AppAllocation>("/allocation/by-app", fp);
+  const byEnv = useApi<EnvAllocation>("/allocation/by-env", fp);
   const chargeback = useApi<ChargebackReadiness>("/allocation/chargeback-readiness");
 
   const janela = `${dayLabel(win.from)} a ${dayLabel(win.to)}`;
+  const drillEntries = (Object.keys(drill) as DrillDimension[]).map((dim) => ({
+    dim,
+    dimLabel: DRILL_LABEL[dim],
+    value: drill[dim] as string,
+  }));
 
   return (
     <>
@@ -86,6 +110,7 @@ export function Alocacao() {
         title="Alocação · showback"
         desc="Cobertura de label, custo alocado por app/ambiente, prontidão de chargeback."
       />
+      <DrillBar entries={drillEntries} onRemove={(dim) => clear(dim as DrillDimension)} onClearAll={() => clear()} />
 
       <Panel
         title="Cobertura de label · por componente"
@@ -188,13 +213,27 @@ export function Alocacao() {
         <Panel title="Custo alocado por app" cap={`Label nativo + reconciliado por recurso/job · ${janela}. Barras "(BigQuery · ...)" são custo de BigQuery sem label nativo, classificado pelo tipo de job — não é uma app de verdade, mas também não é anônimo.`}>
           <LoadingOrError loading={byApp.loading} error={byApp.error} />
           {byApp.data && (
-            <AllocBars title="por app" rows={byApp.data.rows.map((r) => ({ label: r.label_app, value: r.net_cost_brl }))} unallocated={byApp.data.unallocated_net_cost_brl} />
+            <AllocBars
+              title="por app"
+              rows={byApp.data.rows.map((r) => ({ label: r.label_app, value: r.net_cost_brl }))}
+              unallocated={byApp.data.unallocated_net_cost_brl}
+              dimension="app"
+              selected={drill.app}
+              onSelect={toggle}
+            />
           )}
         </Panel>
         <Panel title="Custo alocado por ambiente" cap={`Label nativo + reconciliado (só Cloud Run/Secret Manager — BigQuery não dá pra inferir ambiente pelo job) · ${janela}.`}>
           <LoadingOrError loading={byEnv.loading} error={byEnv.error} />
           {byEnv.data && (
-            <AllocBars title="por ambiente" rows={byEnv.data.rows.map((r) => ({ label: r.label_environment, value: r.net_cost_brl }))} unallocated={byEnv.data.unallocated_net_cost_brl} />
+            <AllocBars
+              title="por ambiente"
+              rows={byEnv.data.rows.map((r) => ({ label: r.label_environment, value: r.net_cost_brl }))}
+              unallocated={byEnv.data.unallocated_net_cost_brl}
+              dimension="environment"
+              selected={drill.environment}
+              onSelect={toggle}
+            />
           )}
         </Panel>
       </div>

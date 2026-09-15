@@ -1,7 +1,8 @@
 import { HBars } from "../charts/HBars";
-import { DataTable, LoadingOrError, PageHeader, Panel } from "../components/ui";
+import { DataTable, DrillBar, LoadingOrError, PageHeader, Panel } from "../components/ui";
 import { useApi } from "../lib/api";
 import { brl, brlPrecise, dayLabel, num } from "../lib/format";
+import { DRILL_LABEL, type DrillDimension, useDrillFilters } from "../lib/useDrillFilters";
 import { filterParams, resolveWindow, useFilters } from "../lib/useFilters";
 import type { MonthlyServicePoint, NewSku, SkuCost } from "../types";
 
@@ -31,17 +32,28 @@ function topMovers(rows: MonthlyServicePoint[] | undefined): Mover[] {
 
 export function Servicos() {
   const [f] = useFilters();
+  const { drill, toggle, clear } = useDrillFilters(f);
   const win = resolveWindow(f);
 
-  const skuCost = useApi<SkuCost[]>("/cost/by-sku", filterParams(f));
+  // fp = filtros do topo (persistentes) + drill por clique (local da tela) -- mesclados
+  // porque o clique deve refiltrar a página inteira.
+  const fp = { ...filterParams(f), ...drill };
+
+  const skuCost = useApi<SkuCost[]>("/cost/by-sku", fp);
   const newSkus = useApi<NewSku[]>("/sku/new");
-  const monthly = useApi<MonthlyServicePoint[]>("/cost/monthly", { environment: f.environment, app: f.app, project: f.project });
+  const monthly = useApi<MonthlyServicePoint[]>("/cost/monthly", { environment: fp.environment, app: fp.app, project: fp.project });
 
   const bySku = skuCost.data ?? [];
   const byService = new Map<string, number>();
   for (const r of bySku) byService.set(r.service_description, (byService.get(r.service_description) ?? 0) + r.net_cost_brl);
   const serviceRows = [...byService.entries()].sort((a, b) => b[1] - a[1]);
   const movers = topMovers(monthly.data);
+
+  const drillEntries = (Object.keys(drill) as DrillDimension[]).map((dim) => ({
+    dim,
+    dimLabel: DRILL_LABEL[dim],
+    value: drill[dim] as string,
+  }));
 
   return (
     <>
@@ -50,6 +62,7 @@ export function Servicos() {
         title="Serviços & SKUs"
         desc="Composição serviço → SKU, top movers mês a mês, custo unitário no período."
       />
+      <DrillBar entries={drillEntries} onRemove={(dim) => clear(dim as DrillDimension)} onClearAll={() => clear()} />
 
       {newSkus.data && newSkus.data.length > 0 && (
         <Panel
@@ -70,7 +83,13 @@ export function Servicos() {
 
       <Panel title="Custo por serviço" cap={`Acumulado no período · ${dayLabel(win.from)} a ${dayLabel(win.to)}.`}>
         <LoadingOrError loading={skuCost.loading} error={skuCost.error} />
-        {bySku.length > 0 && <HBars rows={serviceRows.map(([label, value]) => ({ label, value }))} />}
+        {bySku.length > 0 && (
+          <HBars
+            rows={serviceRows.map(([label, value]) => ({ label, value }))}
+            selected={drill.service}
+            onSelect={(v) => toggle("service", v)}
+          />
+        )}
       </Panel>
 
       <Panel title="Top movers · mês anterior → mês corrente" cap="Maior variação absoluta no topo.">
