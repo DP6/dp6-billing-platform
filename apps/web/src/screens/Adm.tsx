@@ -1,4 +1,4 @@
-import { type CSSProperties, useEffect, useState } from "react";
+import { type CSSProperties, useEffect, useRef, useState } from "react";
 import { DataTable, type DataTableCol, LoadingOrError, PageHeader, Panel } from "../components/ui";
 import { apiDelete, apiPost, apiPut, useApi, useMutationState } from "../lib/api";
 import { brl } from "../lib/format";
@@ -189,6 +189,14 @@ function BudgetsPanel({ budgets, dims, bump }: { budgets: BudgetConfig[]; dims: 
   const projectBudgets = budgets.filter((b) => b.scope !== ACCOUNT_SCOPE);
   const configuredIds = new Set(projectBudgets.map((b) => b.scope));
   const [editing, setEditing] = useState<string | null>(null);
+  // "editar" abre o form BEM abaixo da tabela (que agora ficou mais alta,
+  // com a coluna de sincronização + paginação de 35+ linhas) -- sem isso o
+  // clique parecia não fazer nada, porque o form abria fora da tela sem
+  // rolar (achado testando em prod).
+  const editFormRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (editing) editFormRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [editing]);
 
   const del = useMutationState<void>();
   const remove = async (scope: string) => {
@@ -357,9 +365,14 @@ function BudgetsPanel({ budgets, dims, bump }: { budgets: BudgetConfig[]; dims: 
           )}
           {projectBudgets.length > 0 && <DataTable cols={cols} rows={projectBudgets} defaultPageSize={10} />}
 
-          <div style={{ marginTop: projectBudgets.length > 0 ? 16 : 0 }}>
+          <div ref={editFormRef} style={{ marginTop: projectBudgets.length > 0 ? 16 : 0, scrollMarginTop: 20 }}>
             {editing ? (
               <>
+                <div style={{ fontSize: 12.5, color: "var(--muted-foreground)", marginBottom: 8 }}>
+                  Editando {editingRow?.project_name ?? editingProject?.project_name ?? editing}
+                  {(editingRow?.budget_source_gcp || editingRow?.emails_source_gcp) &&
+                    " — desmarque os toggles de sincronização desse projeto na tabela acima pra liberar os campos travados."}
+                </div>
                 <BudgetForm
                   key={editing}
                   scope={editing}
