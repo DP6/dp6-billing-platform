@@ -320,7 +320,11 @@ function WeeklyReportPanel({ budgets, bump }: { budgets: BudgetConfig[]; bump: (
   const [result, setResult] = useState<SendNowResult | null>(null);
   const [sendingScope, setSendingScope] = useState<string | null>(null);
 
-  const rows = budgets.filter((b) => b.emails.length > 0);
+  // todo budget cadastrado aparece aqui (não só quem já tem e-mail) -- o
+  // toggle "Ativado" decide sozinho quem entra no disparo automático; quem
+  // ainda não tem e-mail só não recebe nada de verdade (run_weekly_report
+  // pula scope sem e-mail, silenciosamente) até alguém cadastrar acima.
+  const rows = budgets;
 
   const setEnabled = async (scope: string, enabled: boolean) => {
     await toggle.run(() => apiPut<BudgetConfig>(`/adm/budgets/${encodeURIComponent(scope)}/report-enabled`, { enabled }));
@@ -352,7 +356,7 @@ function WeeklyReportPanel({ budgets, bump }: { budgets: BudgetConfig[]; bump: (
 
   const cols: DataTableCol<BudgetConfig>[] = [
     { key: "scope", label: "Escopo", render: (r) => scopeLabel(r), sort: (r) => scopeLabel(r) },
-    { key: "emails", label: "E-mails", render: (r) => r.emails.join(", ") },
+    { key: "emails", label: "E-mails", render: (r) => r.emails.join(", ") || "—" },
     {
       key: "enabled",
       label: "Ativado",
@@ -372,7 +376,8 @@ function WeeklyReportPanel({ budgets, bump }: { budgets: BudgetConfig[]; bump: (
         <button
           type="button"
           onClick={() => sendNow(r.scope)}
-          disabled={send.loading}
+          disabled={send.loading || r.emails.length === 0}
+          title={r.emails.length === 0 ? "cadastre um e-mail acima antes de enviar" : undefined}
           style={{ ...btnGhostStyle, ...btnSmallStyle }}
         >
           {sendingScope === r.scope && send.loading ? "enviando…" : "enviar agora"}
@@ -384,14 +389,14 @@ function WeeklyReportPanel({ budgets, bump }: { budgets: BudgetConfig[]; bump: (
   return (
     <Panel
       title="Relatório semanal por e-mail"
-      cap="Toda segunda, 08:00 — gasto no mês, % do orçamento, run-rate, comparação com o mesmo dia do mês anterior e últimos 7 dias, com gráficos. O toggle controla só o disparo automático; os botões “enviar agora” sempre disparam, mesmo desativado."
+      cap="Toda segunda, 08:00 — visão geral do orçamento, custo dos últimos 7 dias e top serviços/projetos, com gráficos. O toggle controla só o disparo automático; os botões “enviar agora” sempre disparam, mesmo desativado."
     >
       <LoadingOrError loading={cfg.loading} error={cfg.error} />
       {!cfg.loading && !cfg.error && (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {rows.length === 0 ? (
             <span style={{ fontSize: 13, color: "var(--muted-foreground)" }}>
-              Nenhum orçamento com e-mail cadastrado ainda — cadastre acima.
+              Nenhum orçamento cadastrado ainda — cadastre acima.
             </span>
           ) : (
             <>
