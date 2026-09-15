@@ -1,14 +1,24 @@
 """Identidade do caller (via IAP) + gates de autorização da aba ADM.
 
-O Cloud Run roda com iap_enabled=true e SÓ o agente do IAP tem roles/run.invoker
-(terraform/modules/app_service/main.tf) -- nenhuma request chega aqui sem ter
-passado pelo IAP primeiro. Mesmo assim, verificamos a assinatura do JWT
-(X-Goog-IAP-JWT-Assertion) em vez de confiar de olhos fechados no header
-X-Goog-Authenticated-User-Email: é barato e tira qualquer dúvida se a
-config de IAM um dia mudar.
+O deploy PRINCIPAL (o que humano acessa) roda com iap_enabled=true e SÓ o
+agente do IAP tem roles/run.invoker (terraform/modules/app_service/main.tf)
+-- nenhuma request chega aqui sem ter passado pelo IAP primeiro. Verificamos
+a assinatura do JWT (X-Goog-IAP-JWT-Assertion) em vez de confiar de olhos
+fechados no header X-Goog-Authenticated-User-Email: é barato e tira qualquer
+dúvida se a config de IAM um dia mudar.
+
+Existe um SEGUNDO deploy, interno, SEM IAP (terraform/environments/prod/
+scheduler.tf) -- o IAP desse projeto usa um OAuth client gerenciado pelo
+Google, que bloqueia por padrão qualquer token OIDC padrão vindo de service
+account (é assim que o Cloud Scheduler autentica) -- achado tentando o job
+semanal pela primeira vez. Nesse segundo deploy o único portão é o
+roles/run.invoker do Cloud Run, concedido só pra SA do scheduler -- ver
+Settings.trust_run_invoker_as_scheduler.
 
 Duas dependencies SEPARADAS, nunca uma junção de checks:
-- require_admin: humano do grupo ADM (ou o e-mail bootstrap).
+- require_admin: humano do grupo ADM (ou o e-mail bootstrap) -- no deploy
+  interno sempre nega (sem IAP não tem como verificar ninguém), o que é
+  intencional: aquele deploy não tem link nenhum, só existe pro Scheduler.
 - require_scheduler: só a SA do Cloud Scheduler (não é humano, não passa
   pelo Directory API, não deve conseguir chamar os endpoints de admin, e
   vice-versa -- um admin humano não deve conseguir chamar o endpoint interno
@@ -100,6 +110,15 @@ def require_admin(email: str | None = Depends(get_caller_email)) -> str:
 
 def require_scheduler(email: str | None = Depends(get_caller_email)) -> str:
     s = get_settings()
+    if s.trust_run_invoker_as_scheduler:
+        # Deploy interno sem IAP na frente (terraform/environments/prod/
+        # scheduler.tf) -- não existe X-Goog-IAP-JWT-Assertion nesse deploy
+        # (nunca passa por IAP), então get_caller_email() sempre devolve
+        # None aqui, não é sinal de request não-autenticada. O único portão
+        # é o roles/run.invoker do próprio Cloud Run nesse serviço, concedido
+        # só pra service account do scheduler -- o Cloud Run já validou a
+        # identidade do bearer token na borda antes da request chegar aqui.
+        return s.scheduler_sa_email
     if not email or not s.scheduler_sa_email or email.lower() != s.scheduler_sa_email.lower():
         raise HTTPException(403, {"code": "forbidden", "message": "Endpoint interno."})
     return email

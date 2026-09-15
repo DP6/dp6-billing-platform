@@ -127,3 +127,28 @@ def test_gcp_budgets_sync_flow_with_dev_force_admin(monkeypatch):
         assert body == {"scopes_created": [], "scopes_updated": [], "scopes_skipped": [], "scopes_failed": []}
     finally:
         get_settings.cache_clear()
+
+
+def test_scheduled_endpoints_forbidden_without_scheduler():
+    """Sem IAP e sem trust_run_invoker_as_scheduler -- nem humano nem
+    ninguém mais consegue chamar os endpoints internos do scheduler."""
+    assert client.post("/api/internal/weekly-report/scheduled-run").status_code == 403
+    assert client.post("/api/internal/gcp-budgets/scheduled-run").status_code == 403
+
+
+def test_scheduled_endpoints_ok_with_trust_run_invoker(monkeypatch):
+    """Deploy interno (sem IAP, terraform/environments/prod/scheduler.tf):
+    trust_run_invoker_as_scheduler=true confia no roles/run.invoker do
+    próprio Cloud Run (só a SA do scheduler tem essa role ali) -- não tem
+    header de IAP nenhum pra verificar nesse deploy."""
+    from billing_api.config import get_settings
+
+    monkeypatch.setenv("BILLING_API_TRUST_RUN_INVOKER_AS_SCHEDULER", "1")
+    get_settings.cache_clear()
+    try:
+        r = client.post("/api/internal/weekly-report/scheduled-run")
+        assert r.status_code == 200
+        r = client.post("/api/internal/gcp-budgets/scheduled-run")
+        assert r.status_code == 200
+    finally:
+        get_settings.cache_clear()
