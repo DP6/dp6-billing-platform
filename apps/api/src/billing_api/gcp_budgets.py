@@ -30,6 +30,7 @@ log = logging.getLogger("billing_api.gcp_budgets")
 
 _BUDGETS_URL = "https://billingbudgets.googleapis.com/v1/billingAccounts/{account}/budgets"
 _CHANNEL_URL = "https://monitoring.googleapis.com/v3/{name}"
+_PROJECT_URL = "https://cloudresourcemanager.googleapis.com/v3/projects/{project_id}"
 
 _SCOPES = [
     # a Billing Budgets API SO aceita cloud-platform ou cloud-billing --
@@ -40,6 +41,10 @@ _SCOPES = [
     # escopo OAuth em si nao tem variante read-only pra essa API.
     "https://www.googleapis.com/auth/cloud-billing",
     "https://www.googleapis.com/auth/monitoring.read",
+    # Cloud Resource Manager (displayName do projeto -- fallback de
+    # _project_name quando o projeto nao tem custo em rpt_cost_daily ainda,
+    # ver comentario la embaixo).
+    "https://www.googleapis.com/auth/cloudplatformprojects.readonly",
 ]
 
 
@@ -73,16 +78,37 @@ def _money_to_float(money: dict | None) -> float | None:
 
 
 def _project_name(project: str | None) -> str | None:
-    """Mesmo idioma de email_report._project_name -- duplicado de propósito
-    (módulo pequeno e independente, não vale a pena um util compartilhado
-    só pra isso)."""
+    """1ª tentativa: rpt_cost_daily (via /dimensions) -- funciona pra projeto
+    que já tem custo faturado, sem chamada HTTP extra. Projeto com budget no
+    GCP mas ainda sem custo (ou não coberto pelo billing export por outro
+    motivo) não aparece lá -- 2ª tentativa: Cloud Resource Manager
+    (displayName oficial do projeto, não depende de ter custo). Sem SA com
+    acesso ao projeto (cross-project, fora do nosso, sem grant) o
+    ResourceManager falha -- devolve None (NUNCA o project_id como nome:
+    scopeLabel()/BudgetsPanel no front já caem pro `scope` sozinhos quando
+    project_name é None, então devolver o id aqui só duplicava a mesma coisa
+    disfarçada de "nome")."""
     if not project or mock_active():
         return None
     try:
         dims = routes.dimensions()
-        return next((p.project_name for p in dims.projects if p.project_id == project), project)
+        found = next((p.project_name for p in dims.projects if p.project_id == project), None)
+        if found:
+            return found
     except Exception:
-        return project
+        log.warning("Falha lendo /dimensions pra resolver nome de %s", project, exc_info=True)
+
+    try:
+        session = _session()
+        resp = session.get(_PROJECT_URL.format(project_id=project), timeout=10)
+        _raise_for_status_verbose(resp)
+        return resp.json().get("displayName") or None
+    except Exception:
+        log.warning(
+            "Não foi possível resolver o nome de exibição do projeto %s (sem custo em rpt_cost_daily "
+            "e sem acesso via Resource Manager) -- fica só com o id por enquanto", project,
+        )
+        return None
 
 
 def _resolve_email_channels(session, channel_names: list[str]) -> list[str]:
