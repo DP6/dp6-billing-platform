@@ -52,9 +52,13 @@ module "api" {
     BILLING_API_WORKSPACE_IMPERSONATE_EMAIL = "admin.victoria@dp6.com.br"
     BILLING_API_ADMIN_GROUP_EMAIL           = "gcp-dp6-gti@dp6.com.br"
     BILLING_API_REPORT_SENDER_EMAIL         = "admin.victoria@dp6.com.br"
-    # BILLING_API_IAP_AUDIENCE: TBD -- resolver empiricamente (logar o JWT do
-    # IAP decodificado, sem verificar assinatura, numa request real) antes de
-    # setar. Ate la, get_caller_email() sempre devolve None (sem dev_force_admin).
+    # Confirmado empiricamente (2026-09-15, log de diagnostico em auth.py com
+    # o JWT real do IAP): /projects/{numero}/locations/{regiao}/services/{nome}
+    # -- formato do IAP nativo do Cloud Run v2 (sem Load Balancer), nao
+    # documentado com clareza. Construido sem depender de module.api.service_name
+    # (nao da pra usar output do proprio modulo como input dele mesmo) -- o
+    # nome eh literal, "${var.name}-${var.env}" do modulo app_service.
+    BILLING_API_IAP_AUDIENCE = "/projects/${var.project_number}/locations/${var.region}/services/billing-platform-api-${local.env}"
   }
 }
 

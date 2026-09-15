@@ -48,7 +48,8 @@ module "api" {
     BILLING_API_ADMIN_GROUP_EMAIL           = "gcp-dp6-gti@dp6.com.br"
     BILLING_API_REPORT_SENDER_EMAIL         = "admin.victoria@dp6.com.br"
     BILLING_API_SCHEDULER_SA_EMAIL          = google_service_account.weekly_report_scheduler.email
-    # BILLING_API_IAP_AUDIENCE: TBD, ver dev/main.tf.
+    # Mesmo formato confirmado em dev/main.tf, só troca o nome do serviço.
+    BILLING_API_IAP_AUDIENCE = "/projects/${var.project_number}/locations/${var.region}/services/billing-platform-api-${local.env}"
   }
 }
 
