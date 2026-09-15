@@ -32,7 +32,7 @@ export interface Scorecard {
   run_rate_eom_brl: number;
   days_elapsed: number;
   days_in_month: number;
-  budget_brl: number;
+  budget_brl: number | null; // null = sem orçamento cadastrado na aba ADM pra esse escopo
   budget_used_pct: number;
   run_rate_vs_budget_pct: number;
   effective_savings_pct: number;
@@ -76,19 +76,19 @@ export interface Threshold {
   value_brl: number;
 }
 export interface Budget {
-  budget_brl: number;
+  budget_brl: number | null; // null = sem orçamento cadastrado na aba ADM pra esse escopo
   net_cost_mtd_brl: number;
   run_rate_eom_brl: number;
   budget_used_pct: number;
   run_rate_vs_budget_pct: number;
-  headroom_brl: number;
+  headroom_brl: number | null;
   projected_breach_date: string | null;
   thresholds: Threshold[];
 }
 export interface BurndownPoint {
   usage_date: string;
   net_cost_cum_brl: number;
-  budget_brl: number;
+  budget_brl: number | null;
   is_realized: boolean;
 }
 export interface ForecastMonth {

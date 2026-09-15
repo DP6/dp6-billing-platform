@@ -39,7 +39,7 @@ class ScorecardDTO(BaseModel):
     run_rate_eom_brl: float
     days_elapsed: int
     days_in_month: int
-    budget_brl: float
+    budget_brl: float | None  # None = sem orçamento cadastrado na aba ADM pra esse escopo
     budget_used_pct: float
     run_rate_vs_budget_pct: float
     effective_savings_pct: float
@@ -94,12 +94,12 @@ class ThresholdDTO(BaseModel):
 
 
 class BudgetDTO(BaseModel):
-    budget_brl: float
+    budget_brl: float | None  # None = sem orçamento cadastrado na aba ADM pra esse escopo
     net_cost_mtd_brl: float
     run_rate_eom_brl: float
     budget_used_pct: float
     run_rate_vs_budget_pct: float
-    headroom_brl: float
+    headroom_brl: float | None
     projected_breach_date: str | None
     thresholds: list[ThresholdDTO]
 
@@ -107,7 +107,7 @@ class BudgetDTO(BaseModel):
 class BurndownPointDTO(BaseModel):
     usage_date: str
     net_cost_cum_brl: float
-    budget_brl: float
+    budget_brl: float | None
     is_realized: bool
 
 

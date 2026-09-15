@@ -157,16 +157,20 @@ export function VisaoGeral() {
             <MetricGrid cols={2}>
               <MetricTile
                 label="Custo vs. orçamento"
-                value={pctPlain(s.budget_used_pct)}
+                value={s.budget_brl == null ? "—" : pctPlain(s.budget_used_pct)}
                 sub={
-                  <>
-                    de <span className="mono">{brl(s.budget_brl)}</span> · run-rate{" "}
-                    {pctPlain(s.run_rate_vs_budget_pct)}
-                    <br />
-                    <StatusBadge tone={s.run_rate_vs_budget_pct <= 1 ? "ok" : "warn"}>
-                      {s.run_rate_vs_budget_pct <= 1 ? "dentro do orçamento" : "acima no ritmo atual"}
-                    </StatusBadge>
-                  </>
+                  s.budget_brl == null ? (
+                    <StatusBadge tone="neutral">sem orçamento cadastrado (aba ADM)</StatusBadge>
+                  ) : (
+                    <>
+                      de <span className="mono">{brl(s.budget_brl)}</span> · run-rate{" "}
+                      {pctPlain(s.run_rate_vs_budget_pct)}
+                      <br />
+                      <StatusBadge tone={s.run_rate_vs_budget_pct <= 1 ? "ok" : "warn"}>
+                        {s.run_rate_vs_budget_pct <= 1 ? "dentro do orçamento" : "acima no ritmo atual"}
+                      </StatusBadge>
+                    </>
+                  )
                 }
               />
               <MetricTile
@@ -252,7 +256,10 @@ export function VisaoGeral() {
 
       {/* Orçamento & previsão (mês-âncora) */}
       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        <span className="eyebrow">Orçamento do mês · {brl(budget.data?.budget_brl ?? 20)}</span>
+        <span className="eyebrow">
+          Orçamento do mês ·{" "}
+          {budget.data?.budget_brl == null ? "sem orçamento cadastrado" : brl(budget.data.budget_brl)}
+        </span>
         <h2 style={{ fontSize: 18 }}>Orçamento &amp; previsão</h2>
       </div>
       <LoadingOrError loading={budget.loading} error={budget.error} />
@@ -261,17 +268,17 @@ export function VisaoGeral() {
           <MetricTile
             label="Consumido · MTD"
             value={brl(budget.data.net_cost_mtd_brl)}
-            sub={pctPlain(budget.data.budget_used_pct)}
+            sub={budget.data.budget_brl == null ? "sem orçamento cadastrado (aba ADM)" : pctPlain(budget.data.budget_used_pct)}
           />
           <MetricTile
             label="Folga projetada"
-            value={brl(budget.data.headroom_brl)}
-            tone={budget.data.headroom_brl >= 0 ? "ok" : "bad"}
+            value={budget.data.headroom_brl == null ? "—" : brl(budget.data.headroom_brl)}
+            tone={budget.data.headroom_brl == null ? "neutral" : budget.data.headroom_brl >= 0 ? "ok" : "bad"}
             sub="orçamento − projeção linear"
           />
           <MetricTile
             label="Estouro projetado"
-            value={budget.data.projected_breach_date ?? "sem estouro"}
+            value={budget.data.budget_brl == null ? "—" : (budget.data.projected_breach_date ?? "sem estouro")}
             sub="no ritmo atual"
           />
         </MetricGrid>
@@ -288,7 +295,7 @@ export function VisaoGeral() {
               data={burndown.data.map((p) => ({
                 label: brDate(p.usage_date),
                 value: p.net_cost_cum_brl,
-                ma7: p.budget_brl,
+                ma7: p.budget_brl ?? undefined, // sem orçamento cadastrado -> AreaTrend some com a linha tracejada
               }))}
             />
           )}

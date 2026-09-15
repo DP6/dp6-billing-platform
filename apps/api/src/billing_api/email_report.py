@@ -69,6 +69,25 @@ def _project_name(project: str | None) -> str | None:
         return project
 
 
+_TOP_N = 5
+
+
+def _top_services(project: str | None, from_: str, to: str) -> list[m.ServiceCostDTO]:
+    """Top serviços por custo no mês -- cost_by_service já devolve ORDER BY
+    net_cost_brl DESC, só corta em N."""
+    if mock_active():
+        return []
+    return routes.cost_by_service(from_=from_, to=to, project=project)[:_TOP_N]
+
+
+def _top_projects(from_: str, to: str) -> list[m.ProjectCostDTO]:
+    """Só faz sentido pro escopo conta inteira (1 projeto não tem "top
+    projeto" dele mesmo)."""
+    if mock_active():
+        return []
+    return routes.cost_by_project(from_=from_, to=to)[:_TOP_N]
+
+
 # ---------------------------------------------------------------- graficos
 
 # Mesma paleta/tokens (valores LITERAIS do tema claro, index.css) do grafico
@@ -125,9 +144,40 @@ def _render_charts(points: list[m.DailyPointDTO]) -> dict[str, bytes]:
 
 # ---------------------------------------------------------------- conteudo
 
+def _brl(v: float) -> str:
+    """R$ 1.234,56 -- mesmo padrão pt-BR do resto do painel (lib/format.ts).
+    Não dá pra confiar em locale do sistema (container não tem pt_BR
+    instalado), então troca "," <-> "." na mão."""
+    s = f"{v:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
+    return f"R$ {s}"
+
+
+def _pct(v: float, digits: int = 1) -> str:
+    return f"{v:.{digits}f}%".replace(".", ",")
+
+
+def _signed_pct(v: float, digits: int = 1) -> str:
+    return f"{v:+.{digits}f}%".replace(".", ",")
+
+
+def _top_table_rows(items: list[tuple[str, float, float]]) -> str:
+    """items: [(label, net_cost_brl, pct_of_total), ...] -- já vem ordenado
+    (top N) de quem chama."""
+    rows = "".join(
+        f"""<tr>
+              <td style="padding:5px 0;color:#1d1d1b">{label}</td>
+              <td style="padding:5px 0;text-align:right;font-weight:600">{_brl(v)}</td>
+              <td style="padding:5px 0 5px 10px;text-align:right;color:#555b62;width:52px">{_pct(pct * 100, 0)}</td>
+            </tr>"""
+        for label, v, pct in items
+    )
+    return f'<table style="width:100%;border-collapse:collapse;margin-top:6px">{rows}</table>'
+
+
 def _render_html(
     scope: str, project_name: str | None, sc: m.ScorecardDTO,
     same_day_last_month: float, last7: list[m.DailyPointDTO], chart_ids: list[str],
+    top_services: list[m.ServiceCostDTO], top_projects: list[m.ProjectCostDTO],
 ) -> str:
     titulo = "Conta inteira" if scope == fsdb.ACCOUNT_SCOPE else (project_name or scope)
     same_day_today = last7[-1].net_cost_brl if last7 else 0.0
@@ -135,6 +185,18 @@ def _render_html(
     delta_pct = (delta / same_day_last_month) if same_day_last_month else 0.0
     total_7d = sum(p.net_cost_brl for p in last7)
     imgs = "".join(f'<img src="cid:{cid}" style="max-width:100%;margin-top:12px" />' for cid in chart_ids)
+
+    sections = ""
+    if top_services:
+        rows = [(s.service_description, s.net_cost_brl, s.pct_of_total) for s in top_services]
+        sections += f"""
+          <h3 style="font-size:13px;color:#1d1d1b;margin:20px 0 0">Top {len(top_services)} serviços — mês corrente</h3>
+          {_top_table_rows(rows)}"""
+    if top_projects:
+        rows = [(p.project_name, p.net_cost_brl, p.pct_of_total) for p in top_projects]
+        sections += f"""
+          <h3 style="font-size:13px;color:#1d1d1b;margin:20px 0 0">Top {len(top_projects)} projetos — mês corrente</h3>
+          {_top_table_rows(rows)}"""
 
     # Fundo/cores fixos em branco (nao usa CSS var nenhuma) -- e-mail e sempre
     # um documento "claro" independente do tema do app; o preview no ADM
@@ -146,18 +208,19 @@ def _render_html(
       <p style="color:#555b62;margin-top:0">Gerado automaticamente · painel FinOps</p>
       <table style="width:100%;border-collapse:collapse;margin-top:16px">
         <tr><td style="padding:6px 0;color:#555b62">Gasto no mês</td>
-            <td style="padding:6px 0;text-align:right;font-weight:600">R$ {sc.net_cost_mtd_brl:,.2f}</td></tr>
+            <td style="padding:6px 0;text-align:right;font-weight:600">{_brl(sc.net_cost_mtd_brl)}</td></tr>
         <tr><td style="padding:6px 0;color:#555b62">% do orçamento</td>
-            <td style="padding:6px 0;text-align:right;font-weight:600">{sc.budget_used_pct * 100:.1f}%</td></tr>
+            <td style="padding:6px 0;text-align:right;font-weight:600">{_pct(sc.budget_used_pct * 100)}</td></tr>
         <tr><td style="padding:6px 0;color:#555b62">Run-rate do mês</td>
-            <td style="padding:6px 0;text-align:right;font-weight:600">R$ {sc.run_rate_eom_brl:,.2f}</td></tr>
+            <td style="padding:6px 0;text-align:right;font-weight:600">{_brl(sc.run_rate_eom_brl)}</td></tr>
         <tr><td style="padding:6px 0;color:#555b62">Mesmo dia, mês anterior</td>
             <td style="padding:6px 0;text-align:right;font-weight:600">
-              R$ {same_day_last_month:,.2f} ({delta_pct:+.1%})</td></tr>
+              {_brl(same_day_last_month)} ({_signed_pct(delta_pct * 100)})</td></tr>
         <tr><td style="padding:6px 0;color:#555b62">Últimos 7 dias</td>
-            <td style="padding:6px 0;text-align:right;font-weight:600">R$ {total_7d:,.2f}</td></tr>
+            <td style="padding:6px 0;text-align:right;font-weight:600">{_brl(total_7d)}</td></tr>
       </table>
       {imgs}
+      {sections}
     </div>
     """.strip()
 
@@ -229,7 +292,15 @@ def _generate_for_scope(scope: str, cfg: dict) -> tuple[str, dict[str, bytes]]:
     same_day_last_month = _same_day_last_month_net_brl(project)
     last7 = _last_7_days(project)
     charts = _render_charts(last7)
-    html = _render_html(scope, project_name, sc, same_day_last_month, last7, list(charts.keys()))
+
+    today = date.today()
+    month_start = today.replace(day=1).isoformat()
+    top_services = _top_services(project, month_start, today.isoformat())
+    # top projetos só faz sentido na conta inteira -- 1 projeto não compara
+    # contra si mesmo.
+    top_projects = _top_projects(month_start, today.isoformat()) if scope == fsdb.ACCOUNT_SCOPE else []
+
+    html = _render_html(scope, project_name, sc, same_day_last_month, last7, list(charts.keys()), top_services, top_projects)
     return html, charts
 
 
