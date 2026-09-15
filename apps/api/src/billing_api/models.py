@@ -263,12 +263,20 @@ class BudgetConfigDTO(BaseModel):
     """1 linha de budgets/{scope} no Firestore. scope = project_id, ou o
     sentinel "_account" pro orcamento da conta inteira. report_enabled
     controla só o disparo AUTOMATICO de segunda -- "enviar agora" (manual)
-    ignora essa flag de proposito, é sempre um disparo explícito."""
+    ignora essa flag de proposito, é sempre um disparo explícito.
+    budget_source_gcp/emails_source_gcp: quando true, o campo correspondente
+    (budget_brl ou emails) é sincronizado do GCP Billing Budgets (gcp_budgets.py)
+    e a UI trava a edição manual -- desligar o toggle assume controle manual
+    permanente daquele campo (sync futura nunca mais mexe nele)."""
     scope: str
     project_name: str | None = None
     budget_brl: float
     emails: list[str]
     report_enabled: bool = False
+    budget_source_gcp: bool = False
+    emails_source_gcp: bool = False
+    gcp_budget_name: str | None = None
+    gcp_synced_at: str | None = None
     updated_at: str | None = None
     updated_by: str | None = None
 
@@ -285,6 +293,22 @@ class BudgetConfigUpsertDTO(BaseModel):
 
 class ReportEnabledUpdateDTO(BaseModel):
     enabled: bool
+
+
+class SyncFlagsUpdateDTO(BaseModel):
+    """PUT /adm/budgets/{scope}/sync-flags -- liga/desliga os 2 toggles de
+    sincronizacao do GCP Billing Budgets, independentes um do outro."""
+    budget_source_gcp: bool
+    emails_source_gcp: bool
+
+
+class SyncBudgetsResultDTO(BaseModel):
+    """Resultado de 1 rodada de gcp_budgets.sync_all -- scopes_skipped são os
+    que tinham os 2 toggles desligados (bookkeeping atualizado, valor não)."""
+    scopes_created: list[str] = []
+    scopes_updated: list[str] = []
+    scopes_skipped: list[str] = []
+    scopes_failed: list[str] = []
 
 
 class WeeklyReportConfigDTO(BaseModel):

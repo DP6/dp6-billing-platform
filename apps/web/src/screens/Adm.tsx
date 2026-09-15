@@ -2,7 +2,7 @@ import { type CSSProperties, useEffect, useState } from "react";
 import { DataTable, type DataTableCol, LoadingOrError, PageHeader, Panel } from "../components/ui";
 import { apiDelete, apiPost, apiPut, useApi, useMutationState } from "../lib/api";
 import { brl } from "../lib/format";
-import type { BudgetConfig, Dimensions, SendNowResult, WeeklyReportConfig } from "../types";
+import type { BudgetConfig, Dimensions, SendNowResult, SyncBudgetsResult, WeeklyReportConfig } from "../types";
 
 const ACCOUNT_SCOPE = "_account";
 
@@ -50,6 +50,50 @@ function scopeLabel(b: Pick<BudgetConfig, "scope" | "project_name">): string {
   return b.scope === ACCOUNT_SCOPE ? "Conta inteira" : (b.project_name ?? b.scope);
 }
 
+const syncBadgeStyle: CSSProperties = {
+  fontSize: 10.5,
+  color: "var(--muted-foreground)",
+  marginTop: 3,
+};
+
+/** Os 2 toggles de sincronização do GCP Billing Budgets, sempre juntos (linha
+ *  da tabela de projetos, e a conta inteira). Independentes um do outro —
+ *  desligar um assume controle manual só daquele campo, o outro continua
+ *  como estava. */
+function SyncToggles({ cfg, bump }: { cfg: BudgetConfig; bump: () => void }) {
+  const { loading, run } = useMutationState<BudgetConfig>();
+  const setFlags = (budget_source_gcp: boolean, emails_source_gcp: boolean) => {
+    run(() =>
+      apiPut<BudgetConfig>(`/adm/budgets/${encodeURIComponent(cfg.scope)}/sync-flags`, {
+        budget_source_gcp,
+        emails_source_gcp,
+      }),
+    ).then(bump);
+  };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 2, fontSize: 11.5 }}>
+      <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
+        <input
+          type="checkbox"
+          checked={cfg.budget_source_gcp}
+          disabled={loading}
+          onChange={(e) => setFlags(e.target.checked, cfg.emails_source_gcp)}
+        />
+        orçamento do GCP
+      </label>
+      <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
+        <input
+          type="checkbox"
+          checked={cfg.emails_source_gcp}
+          disabled={loading}
+          onChange={(e) => setFlags(cfg.budget_source_gcp, e.target.checked)}
+        />
+        e-mails do GCP
+      </label>
+    </div>
+  );
+}
+
 /** Form de cadastro/edição de 1 budget (conta inteira, ou 1 projeto) — só
  *  budget_brl/emails. O toggle do relatório semanal fica só na tabela do
  *  painel de relatório (report-enabled), nunca reenviado por aqui: editar o
@@ -85,6 +129,9 @@ function BudgetForm({
     onSaved();
   };
 
+  const budgetLocked = initial?.budget_source_gcp ?? false;
+  const emailsLocked = initial?.emails_source_gcp ?? false;
+
   return (
     <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: "10px 16px" }}>
       {fixedScopeLabel && (
@@ -99,8 +146,10 @@ function BudgetForm({
           min="0"
           value={budgetBrl}
           onChange={(e) => setBudgetBrl(e.target.value)}
-          style={{ ...inputStyle, width: 140 }}
+          disabled={budgetLocked}
+          style={{ ...inputStyle, width: 140, opacity: budgetLocked ? 0.6 : 1 }}
         />
+        {budgetLocked && <span style={syncBadgeStyle}>sincronizado do GCP — desligue o toggle pra editar</span>}
       </Field>
       <Field label="E-mails responsáveis (grupo e/ou avulso, separados por vírgula)">
         <input
@@ -108,8 +157,10 @@ function BudgetForm({
           value={emails}
           onChange={(e) => setEmails(e.target.value)}
           placeholder="time-x@dp6.com.br, fulano@dp6.com.br"
-          style={{ ...inputStyle, minWidth: 320 }}
+          disabled={emailsLocked}
+          style={{ ...inputStyle, minWidth: 320, opacity: emailsLocked ? 0.6 : 1 }}
         />
+        {emailsLocked && <span style={syncBadgeStyle}>sincronizado do GCP — desligue o toggle pra editar</span>}
       </Field>
       <button type="button" onClick={save} disabled={loading} style={btnStyle}>
         {loading ? "Salvando…" : "Salvar"}
@@ -132,10 +183,19 @@ function BudgetsPanel({ budgets, dims, bump }: { budgets: BudgetConfig[]; dims: 
     bump();
   };
 
+  const sync = useMutationState<SyncBudgetsResult>();
+  const [syncResult, setSyncResult] = useState<SyncBudgetsResult | null>(null);
+  const syncNow = async () => {
+    const r = await sync.run(() => apiPost<SyncBudgetsResult>("/adm/gcp-budgets/sync-now", {}));
+    setSyncResult(r);
+    bump();
+  };
+
   const cols: DataTableCol<BudgetConfig>[] = [
     { key: "project", label: "Projeto", render: (r) => r.project_name ?? r.scope, sort: (r) => r.project_name ?? r.scope },
     { key: "budget", label: "Orçamento", num: true, render: (r) => brl(r.budget_brl), sort: (r) => r.budget_brl },
     { key: "emails", label: "E-mails", render: (r) => r.emails.join(", ") || "—" },
+    { key: "sync", label: "Sincronizar do GCP", render: (r) => <SyncToggles cfg={r} bump={bump} /> },
     {
       key: "actions",
       label: "",
@@ -157,11 +217,33 @@ function BudgetsPanel({ budgets, dims, bump }: { budgets: BudgetConfig[]; dims: 
   const newCandidates = (dims?.projects ?? []).filter((p) => !configuredIds.has(p.project_id));
 
   return (
-    <Panel title="Orçamentos" cap="Budget e e-mails responsáveis, por projeto e para a conta inteira.">
+    <Panel
+      title="Orçamentos"
+      cap="Budget e e-mails responsáveis, por projeto e para a conta inteira. Projeto com budget cadastrado no GCP entra aqui automaticamente na 1ª sincronização — os 2 toggles por linha controlam se orçamento/e-mails continuam vindo do GCP ou passam a ser manuais."
+      actions={
+        <button type="button" onClick={syncNow} disabled={sync.loading} style={{ ...btnGhostStyle, ...btnSmallStyle }}>
+          {sync.loading ? "Sincronizando…" : "Sincronizar orçamentos do GCP agora"}
+        </button>
+      }
+    >
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        {sync.error && <span style={{ color: "var(--bad)", fontSize: 12.5 }}>{sync.error}</span>}
+        {syncResult && (
+          <span style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
+            {syncResult.scopes_created.length > 0 && `criados: ${syncResult.scopes_created.join(", ")}. `}
+            {syncResult.scopes_updated.length > 0 && `atualizados: ${syncResult.scopes_updated.join(", ")}. `}
+            {syncResult.scopes_skipped.length > 0 && `pulados (toggle desligado): ${syncResult.scopes_skipped.join(", ")}. `}
+            {syncResult.scopes_failed.length > 0 && `falharam: ${syncResult.scopes_failed.join(", ")}. `}
+            {syncResult.scopes_created.length + syncResult.scopes_updated.length + syncResult.scopes_skipped.length + syncResult.scopes_failed.length === 0 &&
+              "nenhum budget encontrado no GCP."}
+          </span>
+        )}
         <div>
           <span style={{ ...fieldLabel, display: "block", marginBottom: 8 }}>Conta inteira</span>
-          <BudgetForm key={`account-${account?.updated_at ?? ""}`} scope={ACCOUNT_SCOPE} initial={account} onSaved={bump} />
+          <div style={{ display: "flex", alignItems: "flex-end", gap: 20, flexWrap: "wrap" }}>
+            <BudgetForm key={`account-${account?.updated_at ?? ""}`} scope={ACCOUNT_SCOPE} initial={account} onSaved={bump} />
+            {account && <SyncToggles cfg={account} bump={bump} />}
+          </div>
         </div>
 
         <div style={{ paddingTop: 16, borderTop: "1px solid var(--border)" }}>

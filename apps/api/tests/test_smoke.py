@@ -98,3 +98,32 @@ def test_adm_budgets_ok_with_dev_force_admin(monkeypatch):
         assert r.status_code == 200
     finally:
         get_settings.cache_clear()
+
+
+def test_gcp_budgets_sync_now_forbidden_without_admin():
+    r = client.post("/api/adm/gcp-budgets/sync-now", json={})
+    assert r.status_code == 403
+
+
+def test_gcp_budgets_sync_flow_with_dev_force_admin(monkeypatch):
+    """Modo mock: sync_all nem chama a API do GCP (mock_active() de gcp_budgets.py),
+    então dá pra testar o fluxo inteiro (toggle + sync-now) sem nenhum grant real."""
+    from billing_api.config import get_settings
+
+    monkeypatch.setenv("BILLING_API_DEV_FORCE_ADMIN", "1")
+    get_settings.cache_clear()
+    try:
+        r = client.put(
+            "/api/adm/budgets/dp6-ci-polaris/sync-flags",
+            json={"budget_source_gcp": True, "emails_source_gcp": False},
+        )
+        assert r.status_code == 200
+        assert r.json()["budget_source_gcp"] is True
+        assert r.json()["emails_source_gcp"] is False
+
+        r = client.post("/api/adm/gcp-budgets/sync-now", json={})
+        assert r.status_code == 200
+        body = r.json()
+        assert body == {"scopes_created": [], "scopes_updated": [], "scopes_skipped": [], "scopes_failed": []}
+    finally:
+        get_settings.cache_clear()
