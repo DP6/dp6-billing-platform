@@ -194,6 +194,85 @@ export function Chip({ tone, children }: { tone: "ok" | "warn" | "bad"; children
   );
 }
 
+/** Barra de chips do drill-down por clique em gráfico (não confundir com o botão "Limpar
+ *  filtros" da FilterBar do topo -- esta some sozinha quando não há nenhum clique ativo).
+ *  `entries` já vem no formato [rótulo da dimensão, valor, dimensão] pra permitir remover
+ *  1 de cada vez. */
+export function DrillBar({
+  entries,
+  onRemove,
+  onClearAll,
+}: {
+  entries: { dimLabel: string; value: string; dim: string }[];
+  onRemove: (dim: string) => void;
+  onClearAll: () => void;
+}) {
+  if (entries.length === 0) return null;
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: -4 }}>
+      <span style={{ fontSize: 12, color: "var(--ink-dim)" }}>Filtrando por (clique no gráfico):</span>
+      {entries.map((e) => (
+        <span
+          key={e.dim}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "3px 6px 3px 10px",
+            borderRadius: 999,
+            fontSize: 12,
+            fontWeight: 500,
+            color: "var(--foreground)",
+            background: "var(--muted)",
+            border: "1px solid var(--border-strong)",
+          }}
+        >
+          {e.dimLabel}: <strong>{e.value}</strong>
+          <button
+            type="button"
+            onClick={() => onRemove(e.dim)}
+            aria-label={`Remover filtro de ${e.dimLabel}`}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 16,
+              height: 16,
+              padding: 0,
+              background: "transparent",
+              border: 0,
+              borderRadius: "50%",
+              color: "var(--muted-foreground)",
+              cursor: "pointer",
+              fontSize: 12,
+              lineHeight: 1,
+            }}
+          >
+            ×
+          </button>
+        </span>
+      ))}
+      {entries.length > 1 && (
+        <button
+          type="button"
+          onClick={onClearAll}
+          style={{
+            padding: "3px 8px",
+            background: "transparent",
+            border: "1px solid var(--border-strong)",
+            borderRadius: "var(--radius)",
+            color: "var(--muted-foreground)",
+            cursor: "pointer",
+            fontSize: 11.5,
+          }}
+        >
+          Limpar todos
+        </button>
+      )}
+    </div>
+  );
+}
+
 const PAGE_SIZE_OPTIONS = [5, 10, 20, 50, 100];
 
 export interface DataTableCol<T> {

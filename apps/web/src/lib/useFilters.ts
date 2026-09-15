@@ -62,7 +62,7 @@ export function resolveWindow(f: Filters): { from: string; to: string } {
 
 const STORAGE = "pcm:filters";
 
-function readStored(): Partial<Pick<Filters, "period">> {
+function readStored(): Partial<Filters> {
   try {
     const raw = localStorage.getItem(STORAGE);
     return raw ? JSON.parse(raw) : {};
@@ -72,7 +72,8 @@ function readStored(): Partial<Pick<Filters, "period">> {
 }
 
 /** Estado dos filtros globais na querystring (links compartilháveis).
- *  `pcm:filters` só pré-preenche period quando a URL não traz nada. */
+ *  `pcm:filters` pré-preenche qualquer campo ausente na URL (aba nova/sessão nova sem
+ *  querystring) -- navegação normal entre telas já persiste via NavLink + search. */
 export function useFilters(): [Filters, (patch: Partial<Filters>) => void] {
   const [sp, setSp] = useSearchParams();
   const stored = readStored();
@@ -83,12 +84,12 @@ export function useFilters(): [Filters, (patch: Partial<Filters>) => void] {
 
   const f: Filters = {
     period,
-    from: period === "custom" ? (sp.get("from") ?? undefined) : undefined,
-    to: period === "custom" ? (sp.get("to") ?? undefined) : undefined,
-    service: sp.get("service") ?? undefined,
-    environment: sp.get("environment") ?? undefined,
-    app: sp.get("app") ?? undefined,
-    project: sp.get("project") ?? undefined,
+    from: period === "custom" ? (sp.get("from") ?? stored.from ?? undefined) : undefined,
+    to: period === "custom" ? (sp.get("to") ?? stored.to ?? undefined) : undefined,
+    service: sp.get("service") ?? stored.service ?? undefined,
+    environment: sp.get("environment") ?? stored.environment ?? undefined,
+    app: sp.get("app") ?? stored.app ?? undefined,
+    project: sp.get("project") ?? stored.project ?? undefined,
   };
 
   const set = (patch: Partial<Filters>) => {
@@ -114,7 +115,12 @@ export function useFilters(): [Filters, (patch: Partial<Filters>) => void] {
     }
     setSp(next, { replace: true });
 
-    const merged = { period: patch.period ?? f.period };
+    // guarda o recorte inteiro (não só period) -- só serve de fallback pra aba nova/
+    // sessão nova sem querystring; navegação normal já persiste via NavLink+search.
+    const merged: Partial<Filters> = { ...f, ...patch };
+    for (const k of Object.keys(merged) as (keyof Filters)[]) {
+      if (!merged[k]) delete merged[k];
+    }
     try {
       localStorage.setItem(STORAGE, JSON.stringify(merged));
     } catch {
