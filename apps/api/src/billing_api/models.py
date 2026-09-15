@@ -265,13 +265,21 @@ class BudgetConfigDTO(BaseModel):
     controla só o disparo AUTOMATICO de segunda -- "enviar agora" (manual)
     ignora essa flag de proposito, é sempre um disparo explícito.
     budget_source_gcp/emails_source_gcp: quando true, o campo correspondente
-    (budget_brl ou emails) é sincronizado do GCP Billing Budgets (gcp_budgets.py)
-    e a UI trava a edição manual -- desligar o toggle assume controle manual
-    permanente daquele campo (sync futura nunca mais mexe nele)."""
+    é sincronizado do GCP Billing Budgets (gcp_budgets.py) -- budget_brl é
+    SOBRESCRITO a cada sync (número oficial do GCP), emails só ganha UNIÃO
+    (nunca remove um e-mail cadastrado à mão). Os dois campos continuam
+    editáveis manualmente mesmo com o toggle ligado -- a próxima
+    sincronização pode sobrescrever/mesclar por cima de novo, conforme a
+    regra de cada campo.
+    gcp_emails: subconjunto de `emails` que veio do GCP na última
+    sincronização -- só pra UI diferenciar "sincronizado" de "cadastrado à
+    mão" na lista, não decide o que o relatório manda (isso é sempre TODO
+    endereço em `emails`)."""
     scope: str
     project_name: str | None = None
     budget_brl: float
     emails: list[str]
+    gcp_emails: list[str] = []
     report_enabled: bool = False
     budget_source_gcp: bool = False
     emails_source_gcp: bool = False

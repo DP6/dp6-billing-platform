@@ -1,10 +1,24 @@
-import { type CSSProperties, useEffect, useState } from "react";
+import { type CSSProperties, useEffect, useRef, useState } from "react";
 import { DataTable, type DataTableCol, LoadingOrError, PageHeader, Panel } from "../components/ui";
 import { apiDelete, apiPost, apiPut, useApi, useMutationState } from "../lib/api";
 import { brl } from "../lib/format";
 import type { BudgetConfig, Dimensions, SendNowResult, SyncBudgetsResult, WeeklyReportConfig } from "../types";
 
 const ACCOUNT_SCOPE = "_account";
+
+/** Dupla confirmação (2 diálogos) pra ação destrutiva em massa -- excluir
+ *  todo orçamento de projeto de uma vez (nunca a conta inteira, ver
+ *  fsdb.delete_budget). Usado nos dois painéis (Orçamentos e Relatório
+ *  semanal), que mostram a mesma lista por ângulos diferentes. */
+function confirmDeleteAll(count: number): boolean {
+  if (!confirm(`Excluir TODOS os ${count} orçamentos de projeto cadastrados? Essa ação não pode ser desfeita.`)) {
+    return false;
+  }
+  return confirm(
+    `Confirma de novo: isso apaga os ${count} orçamentos de projeto (e-mails, toggles, tudo). ` +
+      `O orçamento da conta inteira não é afetado. Tem certeza?`,
+  );
+}
 
 const fieldLabel: CSSProperties = {
   font: "500 10px/1 Ubuntu, sans-serif",
@@ -94,6 +108,38 @@ function SyncToggles({ cfg, bump }: { cfg: BudgetConfig; bump: () => void }) {
   );
 }
 
+/** Lista de e-mails com uma tag pequena nos que vieram do GCP (gcp_emails) —
+ *  só diferenciação visual, o relatório manda pra TODO endereço em `emails`
+ *  do mesmo jeito, sincronizado ou não. */
+function EmailBadgeList({ emails, gcpEmails }: { emails: string[]; gcpEmails: string[] }) {
+  if (emails.length === 0) return <>—</>;
+  const gcpSet = new Set(gcpEmails);
+  return (
+    <>
+      {emails.map((e, i) => (
+        <span key={e}>
+          {i > 0 && ", "}
+          {e}
+          {gcpSet.has(e) && (
+            <span
+              title="Sincronizado do GCP"
+              style={{
+                fontSize: 9,
+                fontWeight: 600,
+                letterSpacing: ".04em",
+                color: "var(--status-ok-foreground)",
+                marginLeft: 3,
+              }}
+            >
+              GCP
+            </span>
+          )}
+        </span>
+      ))}
+    </>
+  );
+}
+
 /** Form de cadastro/edição de 1 budget (conta inteira, ou 1 projeto) — só
  *  budget_brl/emails. O toggle do relatório semanal fica só na tabela do
  *  painel de relatório (report-enabled), nunca reenviado por aqui: editar o
@@ -129,8 +175,8 @@ function BudgetForm({
     onSaved();
   };
 
-  const budgetLocked = initial?.budget_source_gcp ?? false;
-  const emailsLocked = initial?.emails_source_gcp ?? false;
+  const budgetSynced = initial?.budget_source_gcp ?? false;
+  const emailsSynced = initial?.emails_source_gcp ?? false;
 
   return (
     <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: "10px 16px" }}>
@@ -146,10 +192,11 @@ function BudgetForm({
           min="0"
           value={budgetBrl}
           onChange={(e) => setBudgetBrl(e.target.value)}
-          disabled={budgetLocked}
-          style={{ ...inputStyle, width: 140, opacity: budgetLocked ? 0.6 : 1 }}
+          style={{ ...inputStyle, width: 140 }}
         />
-        {budgetLocked && <span style={syncBadgeStyle}>sincronizado do GCP — desligue o toggle pra editar</span>}
+        {budgetSynced && (
+          <span style={syncBadgeStyle}>sincronizado do GCP — uma sincronização futura pode sobrescrever esse valor</span>
+        )}
       </Field>
       <Field label="E-mails responsáveis (grupo e/ou avulso, separados por vírgula)">
         <input
@@ -157,10 +204,22 @@ function BudgetForm({
           value={emails}
           onChange={(e) => setEmails(e.target.value)}
           placeholder="time-x@dp6.com.br, fulano@dp6.com.br"
-          disabled={emailsLocked}
-          style={{ ...inputStyle, minWidth: 320, opacity: emailsLocked ? 0.6 : 1 }}
+          style={{ ...inputStyle, minWidth: 320 }}
         />
-        {emailsLocked && <span style={syncBadgeStyle}>sincronizado do GCP — desligue o toggle pra editar</span>}
+        {emailsSynced ? (
+          <span style={syncBadgeStyle}>
+            sincronizado do GCP — sincronização futura só ACRESCENTA e-mail novo do GCP, nunca remove o que está aqui
+          </span>
+        ) : (
+          initial && initial.gcp_emails.length > 0 && (
+            <span style={syncBadgeStyle}>toggle desligado — e-mails do GCP não são mais adicionados automaticamente</span>
+          )
+        )}
+        {initial && initial.emails.length > 0 && (
+          <div style={{ fontSize: 11.5, color: "var(--muted-foreground)", marginTop: 3 }}>
+            <EmailBadgeList emails={initial.emails} gcpEmails={initial.gcp_emails} />
+          </div>
+        )}
       </Field>
       <button type="button" onClick={save} disabled={loading} style={btnStyle}>
         {loading ? "Salvando…" : "Salvar"}
@@ -175,11 +234,28 @@ function BudgetsPanel({ budgets, dims, bump }: { budgets: BudgetConfig[]; dims: 
   const projectBudgets = budgets.filter((b) => b.scope !== ACCOUNT_SCOPE);
   const configuredIds = new Set(projectBudgets.map((b) => b.scope));
   const [editing, setEditing] = useState<string | null>(null);
+  // "editar" abre o form BEM abaixo da tabela (que agora ficou mais alta,
+  // com a coluna de sincronização + paginação de 35+ linhas) -- sem isso o
+  // clique parecia não fazer nada, porque o form abria fora da tela sem
+  // rolar (achado testando em prod).
+  const editFormRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (editing) editFormRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [editing]);
 
   const del = useMutationState<void>();
   const remove = async (scope: string) => {
     if (!confirm(`Excluir o orçamento de ${scope}?`)) return;
     await del.run(() => apiDelete<void>(`/adm/budgets/${encodeURIComponent(scope)}`));
+    bump();
+  };
+
+  const delAll = useMutationState<void>();
+  const removeAll = async () => {
+    if (!confirmDeleteAll(projectBudgets.length)) return;
+    await delAll.run(async () => {
+      await Promise.all(projectBudgets.map((b) => apiDelete<void>(`/adm/budgets/${encodeURIComponent(b.scope)}`)));
+    });
     bump();
   };
 
@@ -227,7 +303,7 @@ function BudgetsPanel({ budgets, dims, bump }: { budgets: BudgetConfig[]; dims: 
   const cols: DataTableCol<BudgetConfig>[] = [
     { key: "project", label: "Projeto", render: (r) => r.project_name ?? r.scope, sort: (r) => r.project_name ?? r.scope },
     { key: "budget", label: "Orçamento", num: true, render: (r) => brl(r.budget_brl), sort: (r) => r.budget_brl },
-    { key: "emails", label: "E-mails", render: (r) => r.emails.join(", ") || "—" },
+    { key: "emails", label: "E-mails", render: (r) => <EmailBadgeList emails={r.emails} gcpEmails={r.gcp_emails} /> },
     { key: "sync", label: "Sincronizar do GCP", render: (r) => <SyncToggles cfg={r} bump={bump} /> },
     {
       key: "actions",
@@ -254,13 +330,26 @@ function BudgetsPanel({ budgets, dims, bump }: { budgets: BudgetConfig[]; dims: 
       title="Orçamentos"
       cap="Budget e e-mails responsáveis, por projeto e para a conta inteira. Projeto com budget cadastrado no GCP entra aqui automaticamente na 1ª sincronização — os 2 toggles por linha controlam se orçamento/e-mails continuam vindo do GCP ou passam a ser manuais."
       actions={
-        <button type="button" onClick={syncNow} disabled={sync.loading} style={{ ...btnGhostStyle, ...btnSmallStyle }}>
-          {sync.loading ? "Sincronizando…" : "Sincronizar orçamentos do GCP agora"}
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button type="button" onClick={syncNow} disabled={sync.loading} style={{ ...btnGhostStyle, ...btnSmallStyle }}>
+            {sync.loading ? "Sincronizando…" : "Sincronizar orçamentos do GCP agora"}
+          </button>
+          {projectBudgets.length > 0 && (
+            <button
+              type="button"
+              onClick={removeAll}
+              disabled={delAll.loading}
+              style={{ ...btnGhostStyle, ...btnSmallStyle, color: "var(--bad)" }}
+            >
+              {delAll.loading ? "Excluindo…" : "Excluir todos os orçamentos de projeto"}
+            </button>
+          )}
+        </div>
       }
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         {sync.error && <span style={{ color: "var(--bad)", fontSize: 12.5 }}>{sync.error}</span>}
+        {delAll.error && <span style={{ color: "var(--bad)", fontSize: 12.5 }}>{delAll.error}</span>}
         {syncResult && (
           <span style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
             {syncResult.scopes_created.length > 0 && `criados: ${syncResult.scopes_created.join(", ")}. `}
@@ -321,9 +410,12 @@ function BudgetsPanel({ budgets, dims, bump }: { budgets: BudgetConfig[]; dims: 
           )}
           {projectBudgets.length > 0 && <DataTable cols={cols} rows={projectBudgets} defaultPageSize={10} />}
 
-          <div style={{ marginTop: projectBudgets.length > 0 ? 16 : 0 }}>
+          <div ref={editFormRef} style={{ marginTop: projectBudgets.length > 0 ? 16 : 0, scrollMarginTop: 20 }}>
             {editing ? (
               <>
+                <div style={{ fontSize: 12.5, color: "var(--muted-foreground)", marginBottom: 8 }}>
+                  Editando {editingRow?.project_name ?? editingProject?.project_name ?? editing}
+                </div>
                 <BudgetForm
                   key={editing}
                   scope={editing}
@@ -413,6 +505,17 @@ function WeeklyReportPanel({ budgets, bump }: { budgets: BudgetConfig[]; bump: (
     bump();
   };
 
+  // nunca inclui _account (não pode ser excluído, ver fsdb.delete_budget).
+  const deletableRows = rows.filter((r) => r.scope !== ACCOUNT_SCOPE);
+  const delAll = useMutationState<void>();
+  const removeAll = async () => {
+    if (!confirmDeleteAll(deletableRows.length)) return;
+    await delAll.run(async () => {
+      await Promise.all(deletableRows.map((r) => apiDelete<void>(`/adm/budgets/${encodeURIComponent(r.scope)}`)));
+    });
+    bump();
+  };
+
   const sendNow = async (scope?: string) => {
     setSendingScope(scope ?? "*");
     try {
@@ -427,7 +530,7 @@ function WeeklyReportPanel({ budgets, bump }: { budgets: BudgetConfig[]; bump: (
 
   const cols: DataTableCol<BudgetConfig>[] = [
     { key: "scope", label: "Escopo", render: (r) => scopeLabel(r), sort: (r) => scopeLabel(r) },
-    { key: "emails", label: "E-mails", render: (r) => r.emails.join(", ") || "—" },
+    { key: "emails", label: "E-mails", render: (r) => <EmailBadgeList emails={r.emails} gcpEmails={r.gcp_emails} /> },
     {
       key: "enabled",
       label: "Ativado",
@@ -478,11 +581,22 @@ function WeeklyReportPanel({ budgets, bump }: { budgets: BudgetConfig[]; bump: (
                 <button type="button" onClick={() => setAll(false)} disabled={bulkToggle.loading} style={{ ...btnGhostStyle, ...btnSmallStyle }}>
                   desmarcar todos
                 </button>
+                {deletableRows.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={removeAll}
+                    disabled={delAll.loading}
+                    style={{ ...btnGhostStyle, ...btnSmallStyle, color: "var(--bad)" }}
+                  >
+                    {delAll.loading ? "Excluindo…" : "Excluir todos os orçamentos de projeto"}
+                  </button>
+                )}
                 <span style={{ flex: 1 }} />
                 <button type="button" onClick={() => sendNow()} disabled={send.loading} style={btnStyle}>
                   {sendingScope === "*" && send.loading ? "Enviando…" : "Enviar para todos"}
                 </button>
               </div>
+              {delAll.error && <span style={{ color: "var(--bad)", fontSize: 12.5 }}>{delAll.error}</span>}
               <DataTable cols={cols} rows={rows} defaultPageSize={10} />
             </>
           )}
