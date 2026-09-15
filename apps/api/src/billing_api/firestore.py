@@ -74,7 +74,8 @@ def list_budgets() -> list[dict[str, Any]]:
 
 
 def upsert_budget(
-    scope: str, budget_brl: float, emails: list[str], actor_email: str, project_name: str | None = None
+    scope: str, budget_brl: float, emails: list[str], actor_email: str,
+    report_enabled: bool | None = None, project_name: str | None = None,
 ) -> dict[str, Any]:
     doc = {
         "budget_brl": budget_brl,
@@ -82,9 +83,26 @@ def upsert_budget(
         "updated_at": _now(),
         "updated_by": actor_email,
     }
+    # só inclui se explicitamente passado -- merge=True SOBRESCREVE campo
+    # listado, então incluir sempre (com default False) resetaria o toggle
+    # do relatório semanal a cada edição de budget_brl/emails.
+    if report_enabled is not None:
+        doc["report_enabled"] = report_enabled
     if project_name is not None:
         doc["project_name"] = project_name
     _get_client().collection(_BUDGETS).document(scope).set(doc, merge=True)
+    doc["scope"] = scope
+    return doc
+
+
+def set_report_enabled(scope: str, enabled: bool, actor_email: str) -> dict[str, Any]:
+    """Toggle rapido de 1 budget, sem precisar reenviar budget_brl/emails
+    (usado pela tabela do relatorio semanal -- editar o orcamento inteiro é
+    uma acao separada, via upsert_budget)."""
+    ref = _get_client().collection(_BUDGETS).document(scope)
+    ref.set({"report_enabled": enabled, "updated_at": _now(), "updated_by": actor_email}, merge=True)
+    snap = ref.get()
+    doc = snap.to_dict() or {}
     doc["scope"] = scope
     return doc
 
@@ -98,17 +116,13 @@ def delete_budget(scope: str) -> None:
 # ---------------------------------------------------------------- relatorio semanal
 
 def get_weekly_report_config() -> dict[str, Any]:
-    """Fail-loud. Doc pode não existir ainda (1a vez) -- devolve default off."""
+    """Fail-loud. Bookkeeping GLOBAL do disparo automatico (last_run_*) --
+    o toggle em si é por budget (report_enabled, ver upsert_budget/
+    set_report_enabled). Doc pode não existir ainda (1a vez)."""
     snap = _get_client().collection(_ADM_CONFIG).document(_WEEKLY_REPORT_DOC).get()
     if not snap.exists:
-        return {"enabled": False, "updated_at": None, "updated_by": None, "last_run_at": None, "last_run_status": None}
+        return {"last_run_at": None, "last_run_status": None}
     return snap.to_dict()
-
-
-def set_weekly_report_enabled(enabled: bool, actor_email: str) -> dict[str, Any]:
-    doc = _get_client().collection(_ADM_CONFIG).document(_WEEKLY_REPORT_DOC)
-    doc.set({"enabled": enabled, "updated_at": _now(), "updated_by": actor_email}, merge=True)
-    return get_weekly_report_config()
 
 
 def record_report_run(status: str) -> None:

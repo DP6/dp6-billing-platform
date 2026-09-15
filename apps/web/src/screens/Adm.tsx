@@ -35,6 +35,7 @@ const btnGhostStyle: CSSProperties = {
   color: "var(--foreground)",
   border: "1px solid var(--border-strong)",
 };
+const btnSmallStyle: CSSProperties = { padding: "4px 10px", fontSize: 12 };
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -45,16 +46,22 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-/** Form de cadastro/edição de 1 budget (conta inteira, ou 1 projeto). Reaproveitado
- *  nos dois painéis — só muda se `scope` é fixo (conta/edição) ou escolhível (novo). */
+function scopeLabel(b: Pick<BudgetConfig, "scope" | "project_name">): string {
+  return b.scope === ACCOUNT_SCOPE ? "Conta inteira" : (b.project_name ?? b.scope);
+}
+
+/** Form de cadastro/edição de 1 budget (conta inteira, ou 1 projeto) — só
+ *  budget_brl/emails. O toggle do relatório semanal fica só na tabela do
+ *  painel de relatório (report-enabled), nunca reenviado por aqui: editar o
+ *  orçamento não deve resetar se o relatório está ativado ou não. */
 function BudgetForm({
   scope,
-  scopeLabel,
+  fixedScopeLabel,
   initial,
   onSaved,
 }: {
   scope: string;
-  scopeLabel?: string;
+  fixedScopeLabel?: string;
   initial?: BudgetConfig;
   onSaved: () => void;
 }) {
@@ -80,9 +87,9 @@ function BudgetForm({
 
   return (
     <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: "10px 16px" }}>
-      {scopeLabel && (
+      {fixedScopeLabel && (
         <Field label="Escopo">
-          <span style={{ ...inputStyle, minWidth: 160, display: "inline-block" }}>{scopeLabel}</span>
+          <span style={{ ...inputStyle, minWidth: 160, display: "inline-block" }}>{fixedScopeLabel}</span>
         </Field>
       )}
       <Field label="Orçamento mensal (R$)">
@@ -112,38 +119,11 @@ function BudgetForm({
   );
 }
 
-function AccountBudgetPanel() {
-  const budgets = useApi<BudgetConfig[]>("/adm/budgets");
-  const [reloadKey, setReloadKey] = useState(0);
-  const account = budgets.data?.find((b) => b.scope === ACCOUNT_SCOPE);
-
-  return (
-    <Panel title="Orçamento geral da conta" cap="Aplicado quando nenhum filtro de projeto está ativo.">
-      <LoadingOrError loading={budgets.loading} error={budgets.error} />
-      {!budgets.loading && !budgets.error && (
-        <BudgetForm
-          key={reloadKey + (account?.updated_at ?? "")}
-          scope={ACCOUNT_SCOPE}
-          initial={account}
-          onSaved={() => setReloadKey((k) => k + 1)}
-        />
-      )}
-    </Panel>
-  );
-}
-
-function ProjectBudgetsPanel() {
-  const [reloadKey, setReloadKey] = useState(0);
-  const budgets = useApi<BudgetConfig[]>("/adm/budgets", { _r: String(reloadKey) });
-  const dims = useApi<Dimensions>("/dimensions");
-  const [editing, setEditing] = useState<string | null>(null); // project_id sendo editado/criado
-
-  const projectBudgets = (budgets.data ?? []).filter((b) => b.scope !== ACCOUNT_SCOPE);
+function BudgetsPanel({ budgets, dims, bump }: { budgets: BudgetConfig[]; dims: Dimensions | undefined; bump: () => void }) {
+  const account = budgets.find((b) => b.scope === ACCOUNT_SCOPE);
+  const projectBudgets = budgets.filter((b) => b.scope !== ACCOUNT_SCOPE);
   const configuredIds = new Set(projectBudgets.map((b) => b.scope));
-  const bump = () => {
-    setReloadKey((k) => k + 1);
-    setEditing(null);
-  };
+  const [editing, setEditing] = useState<string | null>(null);
 
   const del = useMutationState<void>();
   const remove = async (scope: string) => {
@@ -161,10 +141,10 @@ function ProjectBudgetsPanel() {
       label: "",
       render: (r) => (
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-          <button type="button" onClick={() => setEditing(r.scope)} style={{ ...btnGhostStyle, padding: "4px 10px", fontSize: 12 }}>
+          <button type="button" onClick={() => setEditing(r.scope)} style={{ ...btnGhostStyle, ...btnSmallStyle }}>
             editar
           </button>
-          <button type="button" onClick={() => remove(r.scope)} style={{ ...btnGhostStyle, padding: "4px 10px", fontSize: 12, color: "var(--bad)" }}>
+          <button type="button" onClick={() => remove(r.scope)} style={{ ...btnGhostStyle, ...btnSmallStyle, color: "var(--bad)" }}>
             excluir
           </button>
         </div>
@@ -173,25 +153,38 @@ function ProjectBudgetsPanel() {
   ];
 
   const editingRow = editing ? projectBudgets.find((b) => b.scope === editing) : undefined;
-  const editingProject = dims.data?.projects.find((p) => p.project_id === editing);
-  const newCandidates = (dims.data?.projects ?? []).filter((p) => !configuredIds.has(p.project_id));
+  const editingProject = dims?.projects.find((p) => p.project_id === editing);
+  const newCandidates = (dims?.projects ?? []).filter((p) => !configuredIds.has(p.project_id));
 
   return (
-    <Panel title="Orçamento por projeto" cap="O orçamento mostrado na Visão geral segue o filtro de Projeto do topo.">
-      <LoadingOrError loading={budgets.loading || dims.loading} error={budgets.error ?? dims.error} />
-      {!budgets.loading && !budgets.error && (
-        <>
+    <Panel title="Orçamentos" cap="Budget e e-mails responsáveis, por projeto e para a conta inteira.">
+      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        <div>
+          <span style={{ ...fieldLabel, display: "block", marginBottom: 8 }}>Conta inteira</span>
+          <BudgetForm key={`account-${account?.updated_at ?? ""}`} scope={ACCOUNT_SCOPE} initial={account} onSaved={bump} />
+        </div>
+
+        <div style={{ paddingTop: 16, borderTop: "1px solid var(--border)" }}>
+          <span style={{ ...fieldLabel, display: "block", marginBottom: 8 }}>Por projeto</span>
           {projectBudgets.length > 0 && <DataTable cols={cols} rows={projectBudgets} defaultPageSize={10} />}
 
-          <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
+          <div style={{ marginTop: projectBudgets.length > 0 ? 16 : 0 }}>
             {editing ? (
-              <BudgetForm
-                key={editing}
-                scope={editing}
-                scopeLabel={editingRow?.project_name ?? editingProject?.project_name ?? editing}
-                initial={editingRow}
-                onSaved={bump}
-              />
+              <>
+                <BudgetForm
+                  key={editing}
+                  scope={editing}
+                  fixedScopeLabel={editingRow?.project_name ?? editingProject?.project_name ?? editing}
+                  initial={editingRow}
+                  onSaved={() => {
+                    bump();
+                    setEditing(null);
+                  }}
+                />
+                <button type="button" onClick={() => setEditing(null)} style={{ ...btnGhostStyle, ...btnSmallStyle, marginTop: 10 }}>
+                  cancelar
+                </button>
+              </>
             ) : (
               <Field label="Adicionar orçamento de projeto">
                 <select
@@ -208,73 +201,154 @@ function ProjectBudgetsPanel() {
                 </select>
               </Field>
             )}
-            {editing && (
-              <button type="button" onClick={() => setEditing(null)} style={{ ...btnGhostStyle, marginTop: 10, padding: "4px 10px", fontSize: 12 }}>
-                cancelar
-              </button>
-            )}
           </div>
-        </>
-      )}
+        </div>
+      </div>
     </Panel>
   );
 }
 
-function WeeklyReportPanel() {
-  const [reloadKey, setReloadKey] = useState(0);
-  const cfg = useApi<WeeklyReportConfig>("/adm/weekly-report/config", { _r: String(reloadKey) });
-  const toggle = useMutationState<WeeklyReportConfig>();
+/** Prévia do e-mail — SEMPRE forçada em modo claro (cor literal, não usa var()
+ *  do tema): é um e-mail, um documento estático que vai ser lido igual em
+ *  qualquer cliente; deixar ele herdar o dark mode do app quebrava o texto
+ *  (cor escura sobre fundo escuro herdado). */
+function EmailPreview({ scope, html }: { scope: string; html: string }) {
+  return (
+    <div
+      style={{
+        background: "#ffffff",
+        border: "1px solid #dedcda",
+        borderRadius: "var(--radius)",
+        overflow: "hidden",
+      }}
+    >
+      <div style={{ padding: "8px 16px", background: "#f0efec", borderBottom: "1px solid #dedcda", fontSize: 11.5, color: "#555b62" }}>
+        prévia · {scope === ACCOUNT_SCOPE ? "Conta inteira" : scope}
+      </div>
+      <div style={{ padding: 16 }} dangerouslySetInnerHTML={{ __html: html }} />
+    </div>
+  );
+}
+
+function WeeklyReportPanel({ budgets, bump }: { budgets: BudgetConfig[]; bump: () => void }) {
+  const cfg = useApi<WeeklyReportConfig>("/adm/weekly-report/config");
+  const toggle = useMutationState<BudgetConfig>();
+  const bulkToggle = useMutationState<void>();
   const send = useMutationState<SendNowResult>();
   const [result, setResult] = useState<SendNowResult | null>(null);
+  const [sendingScope, setSendingScope] = useState<string | null>(null);
 
-  const setEnabled = async (enabled: boolean) => {
-    await toggle.run(() => apiPut<WeeklyReportConfig>("/adm/weekly-report/config", { enabled }));
-    setReloadKey((k) => k + 1);
+  const rows = budgets.filter((b) => b.emails.length > 0);
+
+  const setEnabled = async (scope: string, enabled: boolean) => {
+    await toggle.run(() => apiPut<BudgetConfig>(`/adm/budgets/${encodeURIComponent(scope)}/report-enabled`, { enabled }));
+    bump();
   };
 
-  const sendNow = async () => {
-    const r = await send.run(() => apiPost<SendNowResult>("/adm/weekly-report/send-now"));
-    setResult(r);
+  const setAll = async (enabled: boolean) => {
+    await bulkToggle.run(async () => {
+      await Promise.all(
+        rows.filter((r) => r.report_enabled !== enabled).map((r) =>
+          apiPut<BudgetConfig>(`/adm/budgets/${encodeURIComponent(r.scope)}/report-enabled`, { enabled }),
+        ),
+      );
+    });
+    bump();
   };
+
+  const sendNow = async (scope?: string) => {
+    setSendingScope(scope ?? "*");
+    try {
+      const r = await send.run(() => apiPost<SendNowResult>("/adm/weekly-report/send-now", scope ? { scope } : undefined));
+      setResult(r);
+    } finally {
+      setSendingScope(null);
+    }
+  };
+
+  const allEnabled = rows.length > 0 && rows.every((r) => r.report_enabled);
+
+  const cols: DataTableCol<BudgetConfig>[] = [
+    { key: "scope", label: "Escopo", render: (r) => scopeLabel(r), sort: (r) => scopeLabel(r) },
+    { key: "emails", label: "E-mails", render: (r) => r.emails.join(", ") },
+    {
+      key: "enabled",
+      label: "Ativado",
+      render: (r) => (
+        <input
+          type="checkbox"
+          checked={r.report_enabled}
+          disabled={toggle.loading || bulkToggle.loading}
+          onChange={(e) => setEnabled(r.scope, e.target.checked)}
+        />
+      ),
+    },
+    {
+      key: "send",
+      label: "",
+      render: (r) => (
+        <button
+          type="button"
+          onClick={() => sendNow(r.scope)}
+          disabled={send.loading}
+          style={{ ...btnGhostStyle, ...btnSmallStyle }}
+        >
+          {sendingScope === r.scope && send.loading ? "enviando…" : "enviar agora"}
+        </button>
+      ),
+    },
+  ];
 
   return (
     <Panel
       title="Relatório semanal por e-mail"
-      cap="Toda segunda, 08:00 — gasto no mês, % do orçamento, run-rate, comparação com o mês anterior e últimos 7 dias, com gráficos. Enviado pra cada e-mail cadastrado nos orçamentos acima."
+      cap="Toda segunda, 08:00 — gasto no mês, % do orçamento, run-rate, comparação com o mesmo dia do mês anterior e últimos 7 dias, com gráficos. O toggle controla só o disparo automático; os botões “enviar agora” sempre disparam, mesmo desativado."
     >
       <LoadingOrError loading={cfg.loading} error={cfg.error} />
-      {!cfg.loading && !cfg.error && cfg.data && (
+      {!cfg.loading && !cfg.error && (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
-            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5 }}>
-              <input type="checkbox" checked={cfg.data.enabled} disabled={toggle.loading} onChange={(e) => setEnabled(e.target.checked)} />
-              Envio automático ativado
-            </label>
-            <button type="button" onClick={sendNow} disabled={send.loading} style={btnStyle}>
-              {send.loading ? "Enviando…" : "Enviar agora"}
-            </button>
-            {cfg.data.last_run_at && (
-              <span style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
-                última execução: {new Date(cfg.data.last_run_at).toLocaleString("pt-BR")} ({cfg.data.last_run_status})
-              </span>
-            )}
-          </div>
+          {rows.length === 0 ? (
+            <span style={{ fontSize: 13, color: "var(--muted-foreground)" }}>
+              Nenhum orçamento com e-mail cadastrado ainda — cadastre acima.
+            </span>
+          ) : (
+            <>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <button type="button" onClick={() => setAll(true)} disabled={bulkToggle.loading || allEnabled} style={{ ...btnGhostStyle, ...btnSmallStyle }}>
+                  marcar todos
+                </button>
+                <button type="button" onClick={() => setAll(false)} disabled={bulkToggle.loading} style={{ ...btnGhostStyle, ...btnSmallStyle }}>
+                  desmarcar todos
+                </button>
+                <span style={{ flex: 1 }} />
+                <button type="button" onClick={() => sendNow()} disabled={send.loading} style={btnStyle}>
+                  {sendingScope === "*" && send.loading ? "Enviando…" : "Enviar para todos"}
+                </button>
+              </div>
+              <DataTable cols={cols} rows={rows} defaultPageSize={10} />
+            </>
+          )}
+
+          {(cfg.data?.last_run_at || result) && (
+            <span style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
+              {cfg.data?.last_run_at &&
+                `última execução automática: ${new Date(cfg.data.last_run_at).toLocaleString("pt-BR")} (${cfg.data.last_run_status})`}
+            </span>
+          )}
+
           {send.error && <span style={{ color: "var(--bad)", fontSize: 12.5 }}>{send.error}</span>}
+
           {result && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <span style={{ fontSize: 12.5, color: "var(--muted-foreground)" }}>
                 {result.dry_run
-                  ? "Modo dry-run (ambiente não é produção) — e-mail NÃO foi enviado de verdade, veja a prévia abaixo."
-                  : `Enviado: ${result.scopes_sent.join(", ") || "nenhum"}.`}
+                  ? "Ambiente não é produção — modo dry-run: o e-mail NÃO foi enviado de verdade, só a prévia abaixo."
+                  : `Enviado de verdade: ${result.scopes_sent.join(", ") || "nenhum"}.`}
                 {result.scopes_failed.length > 0 && ` Falharam: ${result.scopes_failed.join(", ")}.`}
               </span>
-              {result.preview_html && (
-                <div
-                  style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: 16, background: "var(--card)" }}
-                  // conteúdo gerado pelo nosso próprio backend (email_report.py), não input de usuário.
-                  dangerouslySetInnerHTML={{ __html: result.preview_html }}
-                />
-              )}
+              {Object.entries(result.previews).map(([scope, html]) => (
+                <EmailPreview key={scope} scope={scope} html={html} />
+              ))}
             </div>
           )}
         </div>
@@ -284,6 +358,11 @@ function WeeklyReportPanel() {
 }
 
 export function Adm() {
+  const [reloadKey, setReloadKey] = useState(0);
+  const budgets = useApi<BudgetConfig[]>("/adm/budgets", { _r: String(reloadKey) });
+  const dims = useApi<Dimensions>("/dimensions");
+  const bump = () => setReloadKey((k) => k + 1);
+
   return (
     <>
       <PageHeader
@@ -291,9 +370,13 @@ export function Adm() {
         title="ADM"
         desc="Cadastro de orçamento e e-mails responsáveis (grupo gcp-dp6-gti@dp6.com.br + matheus.fuzati@dp6.com.br) e relatório semanal de custo por e-mail."
       />
-      <AccountBudgetPanel />
-      <ProjectBudgetsPanel />
-      <WeeklyReportPanel />
+      <LoadingOrError loading={budgets.loading} error={budgets.error} />
+      {!budgets.loading && !budgets.error && budgets.data && (
+        <>
+          <BudgetsPanel budgets={budgets.data} dims={dims.data} bump={bump} />
+          <WeeklyReportPanel budgets={budgets.data} bump={bump} />
+        </>
+      )}
     </>
   );
 }

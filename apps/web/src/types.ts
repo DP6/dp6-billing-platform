@@ -32,7 +32,7 @@ export interface Scorecard {
   run_rate_eom_brl: number;
   days_elapsed: number;
   days_in_month: number;
-  budget_brl: number;
+  budget_brl: number | null; // null = sem orçamento cadastrado na aba ADM pra esse escopo
   budget_used_pct: number;
   run_rate_vs_budget_pct: number;
   effective_savings_pct: number;
@@ -76,19 +76,19 @@ export interface Threshold {
   value_brl: number;
 }
 export interface Budget {
-  budget_brl: number;
+  budget_brl: number | null; // null = sem orçamento cadastrado na aba ADM pra esse escopo
   net_cost_mtd_brl: number;
   run_rate_eom_brl: number;
   budget_used_pct: number;
   run_rate_vs_budget_pct: number;
-  headroom_brl: number;
+  headroom_brl: number | null;
   projected_breach_date: string | null;
   thresholds: Threshold[];
 }
 export interface BurndownPoint {
   usage_date: string;
   net_cost_cum_brl: number;
-  budget_brl: number;
+  budget_brl: number | null;
   is_realized: boolean;
 }
 export interface ForecastMonth {
@@ -208,13 +208,15 @@ export interface BudgetConfig {
   project_name: string | null;
   budget_brl: number;
   emails: string[];
+  // controla só o disparo AUTOMÁTICO de segunda — "enviar agora" ignora essa
+  // flag de propósito (é sempre um disparo explícito).
+  report_enabled: boolean;
   updated_at: string | null;
   updated_by: string | null;
 }
 export interface WeeklyReportConfig {
-  enabled: boolean;
-  updated_at: string | null;
-  updated_by: string | null;
+  // bookkeeping global do disparo automático — o toggle em si é por budget
+  // (BudgetConfig.report_enabled).
   last_run_at: string | null;
   last_run_status: string | null;
 }
@@ -222,7 +224,7 @@ export interface SendNowResult {
   dry_run: boolean;
   scopes_sent: string[];
   scopes_failed: string[];
-  preview_html: string | null;
+  previews: Record<string, string>; // scope -> HTML, sempre preenchido
 }
 export interface AnomalyRow {
   usage_date: string;
