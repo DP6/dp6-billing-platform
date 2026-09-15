@@ -45,3 +45,17 @@ resource "google_service_account_iam_member" "dataform_agent_impersonate" {
   # roda depois do binding do Secret (que ja confirmou que o agent propagou) — evita corrida
   depends_on = [google_secret_manager_secret_iam_member.dataform_agent_reads_token]
 }
+
+# serviceAccountTokenCreator (acima) NAO cobre o disparo do CRON: pra iniciar a execucao
+# agendada de um workflow_config com service_account = essa SA, o agent precisa poder
+# "act as" ela (permissao actAs, papel iam.serviceAccountUser — role diferente do de cima).
+# Sem isso as execucoes de dev-daily/prod-daily falham ANTES de comecar, todo dia, com
+# "The caller does not have permission to act as service account" (achado em 2026-09-15,
+# 3 dias seguidos falhando desde a criacao do workflow_config em 2026-09-12).
+resource "google_service_account_iam_member" "dataform_agent_act_as" {
+  service_account_id = google_service_account.dataform.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${google_project_service_identity.dataform.email}"
+
+  depends_on = [google_secret_manager_secret_iam_member.dataform_agent_reads_token]
+}
