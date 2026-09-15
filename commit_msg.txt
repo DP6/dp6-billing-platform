@@ -1,0 +1,34 @@
+feat: relatorio semanal por grupo — toggle por linha, enviar agora + preview sempre
+
+Redesenho do relatorio semanal a partir do feedback de uso real:
+
+- report_enabled sai do doc global unico (adm_config/weekly_report) e vira
+  campo de CADA budget (BudgetConfigDTO.report_enabled) -- cada grupo (conta
+  inteira ou projeto) com orcamento+e-mail cadastrado tem seu proprio toggle,
+  em vez de 1 liga/desliga geral. Marcar/desmarcar todos fica no frontend
+  (loop client-side sobre o novo endpoint de toggle rapido).
+- Novo endpoint PUT /adm/budgets/{scope}/report-enabled -- toggle isolado,
+  sem precisar reenviar budget_brl/emails.
+- Bug real corrigido: upsert_budget sempre incluia report_enabled=False no
+  doc, e Firestore set(merge=True) SOBRESCREVE campo listado -- editar
+  orcamento resetava o toggle a cada save. Agora BudgetConfigUpsertDTO.
+  report_enabled e Optional (None = nao mexe); so a tabela do relatorio
+  grava esse campo. Validado com um client Firestore mockado (unit).
+- "Enviar agora" existe por linha (1 grupo) e para todos -- os dois IGNORAM
+  o toggle de proposito (disparo explicito); so o disparo AGENDADO
+  (Cloud Scheduler) respeita report_enabled (email_report.run_weekly_report
+  ganhou respect_toggle).
+- Preview passa a ser SEMPRE preenchido (nao so dry-run) -- SendNowResultDTO.
+  previews: dict[scope, html], nao mais 1 preview_html unico; da pra ver o
+  que foi mandado de verdade em prod tambem, nao so em dev.
+- Preview no ADM forcado em modo claro (cores literais, nao var() do tema) --
+  antes herdava o dark mode do app e o texto ficava ilegivel (cor escura
+  sobre fundo escuro). E-mail e sempre um documento estatico claro.
+- Grafico (matplotlib) redesenhado pra bater com o visual do AreaTrend da
+  Visao Geral -- area+linha, mesma cor --chart-net do tema claro (#2166ac),
+  grid horizontal claro, sem eixo direito/esquerdo/topo. Validado visualmente
+  (PNG de amostra).
+
+pytest/ruff limpos.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>

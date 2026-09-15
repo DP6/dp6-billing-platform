@@ -53,8 +53,19 @@ def upsert_budget(
 ) -> m.BudgetConfigDTO:
     emails = [e.strip() for e in body.emails if e.strip() and "@" in e]
     if mock_active():
-        return m.BudgetConfigDTO(scope=scope, budget_brl=body.budget_brl, emails=emails)
-    row = _fs_or_503(fsdb.upsert_budget, scope, body.budget_brl, emails, actor)
+        return m.BudgetConfigDTO(scope=scope, budget_brl=body.budget_brl, emails=emails, report_enabled=body.report_enabled or False)
+    row = _fs_or_503(fsdb.upsert_budget, scope, body.budget_brl, emails, actor, body.report_enabled)
+    return m.BudgetConfigDTO(**row)
+
+
+@router.put("/adm/budgets/{scope}/report-enabled", response_model=m.BudgetConfigDTO)
+def set_report_enabled(
+    scope: str, body: m.ReportEnabledUpdateDTO, actor: str = Depends(require_admin)
+) -> m.BudgetConfigDTO:
+    """Toggle rapido (tabela do relatorio semanal) -- nao mexe em budget_brl/emails."""
+    if mock_active():
+        return m.BudgetConfigDTO(scope=scope, budget_brl=20.0, emails=[], report_enabled=body.enabled)
+    row = _fs_or_503(fsdb.set_report_enabled, scope, body.enabled, actor)
     return m.BudgetConfigDTO(**row)
 
 
@@ -67,33 +78,23 @@ def delete_budget(scope: str, _: str = Depends(require_admin)) -> None:
 
 @router.get("/adm/weekly-report/config", response_model=m.WeeklyReportConfigDTO)
 def weekly_report_config(_: str = Depends(require_admin)) -> m.WeeklyReportConfigDTO:
+    """Só bookkeeping do disparo automático (last_run_*) -- o toggle em si é
+    por budget (PUT /adm/budgets/{scope}/report-enabled)."""
     if mock_active():
-        return m.WeeklyReportConfigDTO(enabled=False)
+        return m.WeeklyReportConfigDTO()
     return m.WeeklyReportConfigDTO(**_fs_or_503(fsdb.get_weekly_report_config))
-
-
-@router.put("/adm/weekly-report/config", response_model=m.WeeklyReportConfigDTO)
-def set_weekly_report_config(
-    body: m.WeeklyReportConfigUpdateDTO, actor: str = Depends(require_admin)
-) -> m.WeeklyReportConfigDTO:
-    if mock_active():
-        return m.WeeklyReportConfigDTO(enabled=body.enabled)
-    return m.WeeklyReportConfigDTO(**_fs_or_503(fsdb.set_weekly_report_enabled, body.enabled, actor))
 
 
 @router.post("/adm/weekly-report/send-now", response_model=m.SendNowResultDTO)
 def send_now(body: m.SendNowRequestDTO | None = None, _: str = Depends(require_admin)) -> m.SendNowResultDTO:
-    """Manual, ignora o toggle enabled -- é um disparo explícito do admin."""
+    """Manual (1 linha, via body.scope, ou "enviar pra todos" sem body) --
+    ignora o toggle report_enabled de propósito, é um disparo explícito."""
     scope = body.scope if body else None
-    return email_report.run_weekly_report(only_scope=scope)
+    return email_report.run_weekly_report(only_scope=scope, respect_toggle=False)
 
 
 @router.post("/internal/weekly-report/scheduled-run", response_model=m.SendNowResultDTO)
 def scheduled_run(_: str = Depends(require_scheduler)) -> m.SendNowResultDTO:
-    """Chamado só pelo Cloud Scheduler (segunda 08:00, prod) -- respeita o
-    toggle enabled."""
-    cfg = fsdb.get_weekly_report_config()
-    if not cfg.get("enabled"):
-        fsdb.record_report_run("skipped")
-        return m.SendNowResultDTO(dry_run=True, scopes_sent=[], scopes_failed=[], preview_html=None)
-    return email_report.run_weekly_report()
+    """Chamado só pelo Cloud Scheduler (segunda 08:00, prod) -- manda só pros
+    budgets com report_enabled=true."""
+    return email_report.run_weekly_report(respect_toggle=True)

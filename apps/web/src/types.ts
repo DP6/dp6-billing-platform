@@ -208,13 +208,15 @@ export interface BudgetConfig {
   project_name: string | null;
   budget_brl: number;
   emails: string[];
+  // controla só o disparo AUTOMÁTICO de segunda — "enviar agora" ignora essa
+  // flag de propósito (é sempre um disparo explícito).
+  report_enabled: boolean;
   updated_at: string | null;
   updated_by: string | null;
 }
 export interface WeeklyReportConfig {
-  enabled: boolean;
-  updated_at: string | null;
-  updated_by: string | null;
+  // bookkeeping global do disparo automático — o toggle em si é por budget
+  // (BudgetConfig.report_enabled).
   last_run_at: string | null;
   last_run_status: string | null;
 }
@@ -222,7 +224,7 @@ export interface SendNowResult {
   dry_run: boolean;
   scopes_sent: string[];
   scopes_failed: string[];
-  preview_html: string | null;
+  previews: Record<string, string>; // scope -> HTML, sempre preenchido
 }
 export interface AnomalyRow {
   usage_date: string;
