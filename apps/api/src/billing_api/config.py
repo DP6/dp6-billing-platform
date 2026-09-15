@@ -78,6 +78,14 @@ class Settings(BaseSettings):
     # (require_scheduler em auth.py). "" em dev -- scheduler so existe em prod.
     scheduler_sa_email: str = ""
 
+    # true SÓ no deploy interno sem IAP (terraform/environments/prod/scheduler.tf)
+    # que os 2 jobs do Cloud Scheduler chamam -- ali roles/run.invoker do
+    # Cloud Run (concedido só pra scheduler_sa_email) já é o único portão,
+    # não tem header de IAP pra verificar (nunca passa por ele). O deploy
+    # principal (IAP na frente, atende humano) nunca seta isso -- continua
+    # verificando o JWT do IAP normalmente. Ver auth.require_scheduler.
+    trust_run_invoker_as_scheduler: bool = False
+
     # conta de faturamento (Billing Budgets API, gcp_budgets.py) -- hierarquia
     # SEPARADA do projeto GCP, roles/billing.viewer nao entra no nosso
     # Terraform (pedido externo pra quem administra a billing account).
