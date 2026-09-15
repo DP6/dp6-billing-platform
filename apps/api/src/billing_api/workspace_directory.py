@@ -1,14 +1,22 @@
-"""Cliente do Admin SDK Directory API — lê membros de grupos reais do
-Google Workspace via domain-wide delegation, sem chave de service
-account. A SA de runtime assina o JWT de delegação usando sua própria
-identidade (google.auth.iam.Signer, que chama a IAM Credentials API —
-signBlob — em vez de precisar de uma chave privada local), depois
-impersona settings.workspace_impersonate_email pra ler o grupo.
+"""Cliente do Admin SDK Directory API — confirma pertencimento (direto ou
+aninhado) a grupos do Google Workspace via domain-wide delegation, sem
+chave de service account. A SA de runtime assina o JWT de delegação usando
+sua própria identidade (google.auth.iam.Signer, que chama a IAM
+Credentials API — signBlob — em vez de precisar de uma chave privada
+local), depois impersona settings.workspace_impersonate_email pra
+consultar o grupo.
 
 Porta quase verbatim de polaris-atlas/apps/backend/src/atlas/core/
 workspace_directory.py (mesmo projeto GCP, mesmo mecanismo já em produção
 lá) -- só troca o `settings` importado por get_settings() (como bq.py/
 routes.py já fazem neste repo).
+
+Usa o endpoint groups.hasMember (não groups.members.list): resolve
+pertencimento DERIVADO/aninhado, igual o IAM/IAP do GCP já faz pra liberar
+o Cloud Run. Achado em 2026-09-15: gcp-dp6-gti@dp6.com.br só tem UM membro
+DIRETO, o subgrupo gti@dp6.com.br -- um members.list simples (versão
+anterior deste módulo) nunca batia com o e-mail de uma pessoa real dentro
+desse subgrupo, então ninguém além do bootstrap conseguia a aba ADM.
 
 Pré-requisitos, nenhum gerenciado por este módulo:
 - Admin SDK API habilitada no projeto (já está, dp6-ci-polaris).
@@ -22,11 +30,11 @@ Pré-requisitos, nenhum gerenciado por este módulo:
 
 Fail-closed por design: qualquer falha (delegação não configurada,
 Workspace indisponível, escopo faltando, settings.workspace_impersonate_
-email não setado) retorna lista vazia e loga o erro, nunca propaga
-exceção — get_group_members nunca deve derrubar um endpoint só porque o
-Workspace está fora do ar ou a integração ainda não foi ligada; o pior
-caso é ninguém além do e-mail bootstrap (admin_bootstrap_emails) ter
-acesso à aba ADM, nunca conceder acesso a mais gente do que devia.
+email não setado) retorna False e loga o erro, nunca propaga exceção —
+is_group_member nunca deve derrubar um endpoint só porque o Workspace está
+fora do ar ou a integração ainda não foi ligada; o pior caso é ninguém além
+do e-mail bootstrap (admin_bootstrap_emails) ter acesso à aba ADM, nunca
+conceder acesso a mais gente do que devia.
 """
 
 from __future__ import annotations
@@ -45,8 +53,8 @@ from .config import get_settings
 logger = logging.getLogger(__name__)
 
 _TOKEN_URI = "https://oauth2.googleapis.com/token"
-_DIRECTORY_MEMBERS_URL_TEMPLATE = (
-    "https://admin.googleapis.com/admin/directory/v1/groups/{group_email}/members"
+_HAS_MEMBER_URL_TEMPLATE = (
+    "https://admin.googleapis.com/admin/directory/v1/groups/{group_email}/hasMember/{member_email}"
 )
 _DIRECTORY_SCOPES = [
     "https://www.googleapis.com/auth/admin.directory.group.readonly",
@@ -56,23 +64,25 @@ _DIRECTORY_SCOPES = [
 _CACHE_TTL_SECONDS = 300
 # dict em memória por processo, protegido por lock, TTL curto -- não é custo
 # de query, é latência + cota de uma API externa que roda no caminho de
-# require_admin, chamada em todo endpoint /adm/*.
-_members_cache: dict[str, tuple[float, list[str]]] = {}
-_members_cache_lock = threading.Lock()
+# require_admin, chamada em todo endpoint /adm/*. Chave é o par (grupo,
+# membro) -- a checagem agora é por pessoa (hasMember), não mais um dump
+# do grupo inteiro.
+_membership_cache: dict[tuple[str, str], tuple[float, bool]] = {}
+_membership_cache_lock = threading.Lock()
 
 
-def _cache_get(group_email: str) -> list[str] | None:
+def _cache_get(group_email: str, member_email: str) -> bool | None:
     now = time.monotonic()
-    with _members_cache_lock:
-        cached = _members_cache.get(group_email)
+    with _membership_cache_lock:
+        cached = _membership_cache.get((group_email, member_email))
     if cached is not None and now - cached[0] < _CACHE_TTL_SECONDS:
         return cached[1]
     return None
 
 
-def _cache_set(group_email: str, members: list[str]) -> None:
-    with _members_cache_lock:
-        _members_cache[group_email] = (time.monotonic(), members)
+def _cache_set(group_email: str, member_email: str, is_member: bool) -> None:
+    with _membership_cache_lock:
+        _membership_cache[(group_email, member_email)] = (time.monotonic(), is_member)
 
 
 def _build_delegated_credentials() -> service_account.Credentials | None:
@@ -96,43 +106,41 @@ def _build_delegated_credentials() -> service_account.Credentials | None:
     )
 
 
-def get_group_members(group_email: str) -> list[str]:
-    """E-mails dos membros do grupo do Workspace, normalizados pra
-    lowercase, com cache de 5min. Lista vazia se a integração não
-    estiver configurada ou qualquer chamada falhar — nunca propaga
+def is_group_member(group_email: str, member_email: str) -> bool:
+    """True se member_email pertence a group_email, direto ou aninhado
+    (groups.hasMember resolve a cadeia toda, igual o IAM/IAP do GCP) --
+    com cache de 5min por par (grupo, membro). False se a integração não
+    estiver configurada ou qualquer chamada falhar -- nunca propaga
     exceção (ver docstring do módulo)."""
-    cached = _cache_get(group_email)
+    member_email = member_email.strip().lower()
+    cached = _cache_get(group_email, member_email)
     if cached is not None:
         return cached
 
-    members: list[str] = []
     try:
         credentials = _build_delegated_credentials()
         if credentials is None:
-            return []
+            return False
 
         session = AuthorizedSession(credentials)
-        page_token: str | None = None
-        while True:
-            params = {"maxResults": 200}
-            if page_token:
-                params["pageToken"] = page_token
-            response = session.get(
-                _DIRECTORY_MEMBERS_URL_TEMPLATE.format(group_email=group_email),
-                params=params,
-                timeout=10,
-            )
+        response = session.get(
+            _HAS_MEMBER_URL_TEMPLATE.format(group_email=group_email, member_email=member_email),
+            timeout=10,
+        )
+        if response.status_code == 404:
+            # hasMember devolve 404 em vez de isMember=false quando o
+            # member_email nao existe no dominio -- fora isso, nao-membro
+            # de verdade vem 200 com isMember=false.
+            is_member = False
+        else:
             response.raise_for_status()
-            data = response.json()
-            members.extend(
-                mm["email"].strip().lower() for mm in data.get("members", []) if mm.get("email")
-            )
-            page_token = data.get("nextPageToken")
-            if not page_token:
-                break
+            is_member = bool(response.json().get("isMember"))
     except Exception:
-        logger.exception("Falha ao ler membros do grupo %s no Workspace Directory API", group_email)
-        return []
+        logger.exception(
+            "Falha ao checar pertencimento de %s no grupo %s no Workspace Directory API",
+            member_email, group_email,
+        )
+        return False
 
-    _cache_set(group_email, members)
-    return members
+    _cache_set(group_email, member_email, is_member)
+    return is_member

@@ -89,7 +89,7 @@ def is_admin_email(email: str | None) -> bool:
     e = email.lower()
     if e in {x.lower() for x in s.admin_bootstrap_emails}:
         return True
-    return e in workspace_directory.get_group_members(s.admin_group_email)
+    return workspace_directory.is_group_member(s.admin_group_email, e)
 
 
 def require_admin(email: str | None = Depends(get_caller_email)) -> str:
