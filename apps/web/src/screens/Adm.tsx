@@ -452,8 +452,12 @@ export function Adm() {
         title="ADM"
         desc="Cadastro de orçamento e e-mails responsáveis (grupo gcp-dp6-gti@dp6.com.br + matheus.fuzati@dp6.com.br) e relatório semanal de custo por e-mail."
       />
-      <LoadingOrError loading={budgets.loading} error={budgets.error} />
-      {!budgets.loading && !budgets.error && budgets.data && (
+      <LoadingOrError loading={budgets.loading && !budgets.data} error={budgets.error} />
+      {/* budgets.data (não "!loading && data") -- depois do 1º carregamento,
+          um bump() (toggle, salvar, sincronizar) mantém a tela com o dado
+          anterior visível enquanto refaz o fetch, em vez de desmontar tudo
+          e piscar a cada clique (ver useApi em lib/api.ts). */}
+      {budgets.data && (
         <>
           <BudgetsPanel budgets={budgets.data} dims={dims.data} bump={bump} />
           <WeeklyReportPanel budgets={budgets.data} bump={bump} />

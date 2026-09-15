@@ -32,16 +32,21 @@ export const apiDelete = <T>(path: string) => apiMutate<T>("DELETE", path);
 
 type State<T> = { data?: T; error?: string; loading: boolean };
 
-/** Hook simples de fetch. Refaz quando o `key` muda (ex.: filtros serializados). */
+/** Hook simples de fetch. Refaz quando o `key` muda (ex.: filtros serializados,
+ *  ou um `bump()` de cache-busting depois de uma mutação). Mantém `data`/
+ *  `error` do fetch anterior durante o refetch (só `loading` vira true) --
+ *  sem isso, cada refetch derrubava `data` pra undefined por um instante e a
+ *  tela inteira desmontava/remontava (efeito de "piscar"/recarregar visível
+ *  a cada clique num toggle, ex. aba ADM). */
 export function useApi<T>(path: string, params?: Record<string, string | undefined>): State<T> {
   const key = path + JSON.stringify(params ?? {});
   const [state, setState] = useState<State<T>>({ loading: true });
   useEffect(() => {
     let alive = true;
-    setState({ loading: true });
+    setState((s) => ({ ...s, loading: true }));
     apiGet<T>(path, params)
       .then((data) => alive && setState({ data, loading: false }))
-      .catch((e) => alive && setState({ error: String(e.message ?? e), loading: false }));
+      .catch((e) => alive && setState((s) => ({ ...s, error: String(e.message ?? e), loading: false })));
     return () => {
       alive = false;
     };
