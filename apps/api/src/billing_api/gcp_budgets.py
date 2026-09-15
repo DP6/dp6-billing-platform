@@ -32,7 +32,13 @@ _BUDGETS_URL = "https://billingbudgets.googleapis.com/v1/billingAccounts/{accoun
 _CHANNEL_URL = "https://monitoring.googleapis.com/v3/{name}"
 
 _SCOPES = [
-    "https://www.googleapis.com/auth/cloud-billing.readonly",
+    # a Billing Budgets API SO aceita cloud-platform ou cloud-billing --
+    # cloud-billing.readonly (usado antes) da ACCESS_TOKEN_SCOPE_INSUFFICIENT
+    # mesmo com roles/billing.viewer certo na IAM (achado em prod, corpo do
+    # 403 da API confirmou -- ver PR do logging verboso). roles/billing.viewer
+    # continua sendo o que REALMENTE restringe a leitura a só-leitura; o
+    # escopo OAuth em si nao tem variante read-only pra essa API.
+    "https://www.googleapis.com/auth/cloud-billing",
     "https://www.googleapis.com/auth/monitoring.read",
 ]
 
