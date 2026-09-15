@@ -21,6 +21,8 @@ locals {
     "admin.googleapis.com",          # Directory API -- checagem de grupo (workspace_directory.py)
     "gmail.googleapis.com",          # envio do relatorio semanal (email_report.py)
     "cloudscheduler.googleapis.com", # disparo semanal, so prod (environments/prod/scheduler.tf)
+    "billingbudgets.googleapis.com", # le os budgets do GCP (gcp_budgets.py) -- monitoring.googleapis.com
+    # acima ja cobre a resolucao dos canais de notificacao por e-mail
   ]
 }
 

@@ -107,6 +107,62 @@ def set_report_enabled(scope: str, enabled: bool, actor_email: str) -> dict[str,
     return doc
 
 
+def set_sync_flags(scope: str, budget_source_gcp: bool, emails_source_gcp: bool, actor_email: str) -> dict[str, Any]:
+    """Liga/desliga os 2 toggles de sincronização do GCP Billing Budgets
+    (gcp_budgets.py) -- independente um do outro, mesmo padrão rápido de
+    set_report_enabled (não mexe em budget_brl/emails aqui)."""
+    ref = _get_client().collection(_BUDGETS).document(scope)
+    ref.set(
+        {
+            "budget_source_gcp": budget_source_gcp,
+            "emails_source_gcp": emails_source_gcp,
+            "updated_at": _now(),
+            "updated_by": actor_email,
+        },
+        merge=True,
+    )
+    snap = ref.get()
+    doc = snap.to_dict() or {}
+    doc["scope"] = scope
+    return doc
+
+
+def sync_from_gcp(
+    scope: str, project_name: str | None, gcp_budget_name: str,
+    budget_brl: float | None, emails: list[str] | None,
+) -> dict[str, Any]:
+    """Chamado por gcp_budgets.sync_all, 1x por scope descoberto na Billing
+    Budgets API. budget_brl/emails None = toggle correspondente desligado,
+    não mexe naquele campo (só atualiza gcp_budget_name/gcp_synced_at pro
+    bookkeeping). Doc que ainda não existe é criado com os 2 toggles
+    LIGADOS e os valores do GCP -- é a "adoção automática" na 1ª descoberta."""
+    ref = _get_client().collection(_BUDGETS).document(scope)
+    is_new = not ref.get().exists
+
+    doc: dict[str, Any] = {"gcp_budget_name": gcp_budget_name, "gcp_synced_at": _now()}
+    if project_name is not None:
+        doc["project_name"] = project_name
+
+    if is_new:
+        doc["budget_source_gcp"] = True
+        doc["emails_source_gcp"] = True
+        doc["budget_brl"] = budget_brl if budget_brl is not None else 0.0
+        doc["emails"] = emails or []
+        doc["report_enabled"] = False
+        doc["updated_at"] = _now()
+        doc["updated_by"] = "gcp-budgets-sync"
+    else:
+        if budget_brl is not None:
+            doc["budget_brl"] = budget_brl
+        if emails is not None:
+            doc["emails"] = emails
+
+    ref.set(doc, merge=True)
+    out = ref.get().to_dict() or {}
+    out["scope"] = scope
+    return out
+
+
 def delete_budget(scope: str) -> None:
     if scope == ACCOUNT_SCOPE:
         raise ValueError("o orçamento da conta inteira não pode ser excluído")
