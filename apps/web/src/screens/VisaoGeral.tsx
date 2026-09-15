@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { AreaTrend } from "../charts/AreaTrend";
-import { HBars } from "../charts/HBars";
+import { HBars, type HBarRow } from "../charts/HBars";
 import { type Grain, type GroupBy, TemporalChart } from "../charts/TemporalChart";
 import {
   DataTable,
+  DrillBar,
   LoadingOrError,
   MetricGrid,
   MetricTile,
@@ -13,6 +14,7 @@ import {
 } from "../components/ui";
 import { useApi } from "../lib/api";
 import { brl, monthLabel, monthLong, pct, pctPlain, relativeToNow } from "../lib/format";
+import { DRILL_LABEL, type DrillDimension, useDrillFilters } from "../lib/useDrillFilters";
 import { filterParams, resolveWindow, scopeParams, useFilters } from "../lib/useFilters";
 import type {
   AppAllocation,
@@ -46,44 +48,63 @@ function AllocBars({
   title,
   rows,
   unallocated,
+  dimension,
+  selected,
+  onSelect,
 }: {
   title: string;
   rows: { label: string; value: number }[];
   unallocated: number;
+  dimension: DrillDimension;
+  selected?: string;
+  onSelect: (dim: DrillDimension, value: string) => void;
 }) {
-  const all = [...rows, { label: "(não-alocado)", value: unallocated }];
+  const all: HBarRow[] = [...rows, { label: "(não-alocado)", value: unallocated, disabled: true }];
   return (
     <div>
       <span style={groupEyebrow}>{title}</span>
-      <HBars rows={all.map((r) => ({ label: r.label, value: r.value }))} />
+      <HBars rows={all} selected={selected} onSelect={(v) => onSelect(dimension, v)} />
     </div>
   );
 }
 
 export function VisaoGeral() {
   const [f] = useFilters();
+  const { drill, toggle, clear } = useDrillFilters(f);
   const win = resolveWindow(f);
   const janela = `${brDate(win.from)} a ${brDate(win.to)}`;
 
   const [series, setSeries] = useState<{ grain: Grain; groupBy: GroupBy }>({ grain: "day", groupBy: "none" });
 
+  // fp/scp = filtros do topo (persistentes) + drill por clique (local da tela, some ao
+  // trocar de aba) -- mesclados porque o clique deve refiltrar a página inteira.
+  const fp = { ...filterParams(f), ...drill };
+  const scp = { ...scopeParams(f), ...drill };
+
   const dims = useApi<Dimensions>("/dimensions");
-  const sc = useApi<Scorecard>("/scorecard", filterParams(f));
-  const svc = useApi<ServiceCost[]>("/cost/by-service", filterParams(f));
-  const byProject = useApi<ProjectCost[]>("/cost/by-project", filterParams(f));
-  const recon = useApi<ReconRow[]>("/reconciliation", scopeParams(f));
-  const budget = useApi<Budget>("/budget", scopeParams(f));
+  const sc = useApi<Scorecard>("/scorecard", fp);
+  const svc = useApi<ServiceCost[]>("/cost/by-service", fp);
+  const byProject = useApi<ProjectCost[]>("/cost/by-project", fp);
+  const recon = useApi<ReconRow[]>("/reconciliation", scp);
+  const budget = useApi<Budget>("/budget", scp);
   const burndown = useApi<BurndownPoint[]>("/budget/burndown");
   const forecast = useApi<ForecastMonth[]>("/forecast", { horizon: "3" });
   const cseries = useApi<CostSeriesPoint[]>("/cost/series", {
-    ...filterParams(f),
+    ...fp,
     grain: series.grain,
     group_by: series.groupBy,
   });
   // by-app/by-env exigem from/to (allocation/by-app e /by-env leem fct_billing_cost_daily
   // por usage_date) -- scopeParams não manda período, dava 422 (params obrigatórios ausentes).
-  const byApp = useApi<AppAllocation>("/allocation/by-app", filterParams(f));
-  const byEnv = useApi<EnvAllocation>("/allocation/by-env", filterParams(f));
+  const byApp = useApi<AppAllocation>("/allocation/by-app", fp);
+  const byEnv = useApi<EnvAllocation>("/allocation/by-env", fp);
+
+  const seriesDim = series.groupBy !== "none" ? (series.groupBy as DrillDimension) : undefined;
+  const drillEntries = (Object.keys(drill) as DrillDimension[]).map((dim) => ({
+    dim,
+    dimLabel: DRILL_LABEL[dim],
+    value: drill[dim] as string,
+  }));
 
   const s = sc.data;
   const d = dims.data;
@@ -104,6 +125,7 @@ export function VisaoGeral() {
           </>
         }
       />
+      <DrillBar entries={drillEntries} onRemove={(dim) => clear(dim as DrillDimension)} onClearAll={() => clear()} />
 
       {/* tira de saúde dos dados */}
       <div
@@ -361,6 +383,8 @@ export function VisaoGeral() {
           grain={series.grain}
           groupBy={series.groupBy}
           onChange={setSeries}
+          selected={seriesDim ? drill[seriesDim] : undefined}
+          onSelect={seriesDim ? (v) => toggle(seriesDim, v) : undefined}
         />
       </Panel>
 
@@ -377,6 +401,8 @@ export function VisaoGeral() {
                   value: r.net_cost_brl,
                   pct: r.pct_of_total,
                 }))}
+                selected={drill.service}
+                onSelect={(v) => toggle("service", v)}
               />
             ))}
         </Panel>
@@ -390,9 +416,12 @@ export function VisaoGeral() {
               <HBars
                 rows={byProject.data.map((r) => ({
                   label: r.project_name,
+                  filterValue: r.project_id,
                   value: r.net_cost_brl,
                   pct: r.pct_of_total,
                 }))}
+                selected={drill.project}
+                onSelect={(v) => toggle("project", v)}
               />
             ))}
         </Panel>
@@ -410,6 +439,9 @@ export function VisaoGeral() {
                 title="por app"
                 rows={byApp.data.rows.map((r) => ({ label: r.label_app, value: r.net_cost_brl }))}
                 unallocated={byApp.data.unallocated_net_cost_brl}
+                dimension="app"
+                selected={drill.app}
+                onSelect={toggle}
               />
             )}
             {byEnv.data && (
@@ -417,6 +449,9 @@ export function VisaoGeral() {
                 title="por ambiente"
                 rows={byEnv.data.rows.map((r) => ({ label: r.label_environment, value: r.net_cost_brl }))}
                 unallocated={byEnv.data.unallocated_net_cost_brl}
+                dimension="environment"
+                selected={drill.environment}
+                onSelect={toggle}
               />
             )}
           </div>

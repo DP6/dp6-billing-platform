@@ -278,6 +278,10 @@ function FilterBar() {
 
 export default function App() {
   const tabs = useTabs();
+  // sp aqui só serve pra repassar a querystring atual nos links de aba (abaixo) --
+  // NavLink a="/rota" descarta location.search por padrão, o que derrubava
+  // service/environment/app/project/from/to a cada troca de tela.
+  const [sp] = useSearchParams();
   return (
     <>
       <TopBar />
@@ -294,7 +298,7 @@ export default function App() {
         {tabs.map(([to, label]) => (
           <NavLink
             key={to}
-            to={to}
+            to={{ pathname: to, search: sp.toString() }}
             end={to === "/"}
             style={({ isActive }) => ({
               padding: "13px 13px 11px",
