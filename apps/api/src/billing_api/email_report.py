@@ -35,7 +35,7 @@ from email.mime.text import MIMEText
 from . import firestore as fsdb
 from . import models as m
 from . import routes
-from .bq import mock_active
+from .bq import mock_active, query
 from .config import get_settings
 
 log = logging.getLogger("billing_api.email_report")
@@ -93,6 +93,26 @@ def _top_projects(from_: str, to: str) -> list[m.ProjectCostDTO]:
     if mock_active():
         return []
     return routes.cost_by_project(from_=from_, to=to)[:_TOP_N]
+
+
+def _all_time_total(project: str | None) -> tuple[float, str | None]:
+    """Custo líquido acumulado desde o início dos dados + a partir de quando
+    (MIN(usage_date)) -- mesma rpt_cost_daily usada no resto do relatório,
+    sem filtro de período. None de "desde" só ocorre se não houver nenhuma
+    linha pro escopo (nunca aconteceu na conta inteira, mas um projeto novo
+    sem carga ainda pode cair aqui)."""
+    if mock_active():
+        return 0.0, None
+    where, params = ("", {})
+    if project:
+        where, params = " AND project_id = @project", {"project": project}
+    r = query(f"""
+        SELECT SUM(net_cost_brl) total, MIN(usage_date) since
+        FROM `{routes.RPT}.rpt_cost_daily`
+        WHERE 1=1 {where}
+    """, params)[0]
+    since = r["since"]
+    return float(r["total"] or 0.0), (since.isoformat() if since else None)
 
 
 # ---------------------------------------------------------------- graficos
@@ -226,6 +246,44 @@ def _render_hbars_chart(items: list[tuple[str, float, float]], title: str, width
     return buf.getvalue()
 
 
+def _progress_bar_html(label: str, value_label: str, pct: float, fill_color: str) -> str:
+    """1 "barrinha" de progresso -- inspirada no relatório de receita do
+    financeiro (tabela aninhada com largura em %, não CSS de layout moderno,
+    pelo mesmo motivo dos gráficos matplotlib: cliente de e-mail não confia
+    em flexbox/grid). `pct` já vem 0-100, sem clamping (pode passar de 100%
+    de propósito -- estourar o orçamento é informação, não bug)."""
+    fill_pct = max(0.0, min(pct, 100.0))
+    pct_label = _pct(pct, 0)
+    # rótulo dentro da barra só cabe se o preenchido for largo o bastante;
+    # senão o "% do orçamento" ficaria cortado ou vazando pra fora da área
+    # escura (mesmo corte de bom senso usado em HBars.tsx no app).
+    label_inside = fill_pct >= 18
+    inner_label = (
+        f'<td style="height:24px;color:#ffffff;font:600 11.5px/1 Ubuntu,sans-serif;'
+        f'text-align:right;padding-right:9px;white-space:nowrap">{pct_label}</td>'
+        if label_inside else '<td style="height:24px"></td>'
+    )
+    outside_label = "" if label_inside else (
+        f'<span style="font:600 11.5px/1 Ubuntu,sans-serif;color:{_INK};margin-left:8px">{pct_label}</span>'
+    )
+    return f"""<div style="margin-bottom:14px">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
+        <tr>
+          <td style="font-size:12px;color:{_MUTED};padding-bottom:5px">{label}</td>
+          <td style="font-size:12px;color:{_INK};font-weight:600;text-align:right;padding-bottom:5px;white-space:nowrap">{value_label}</td>
+        </tr>
+      </table>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:{_CARD_BG};border:1px solid {_BORDER};border-radius:12px">
+        <tr><td style="border-radius:12px;padding:0">
+          <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:{fill_pct:.1f}%;min-width:{'28px' if label_inside else '2px'};background:{fill_color};border-radius:12px">
+            <tr>{inner_label}</tr>
+          </table>
+        </td></tr>
+      </table>
+      {f'<div style="margin-top:3px">{outside_label}</div>' if outside_label else ""}
+    </div>"""
+
+
 # ---------------------------------------------------------------- formatacao
 
 def _brl(v: float) -> str:
@@ -242,6 +300,16 @@ def _pct(v: float, digits: int = 1) -> str:
 
 def _signed_pct(v: float, digits: int = 1) -> str:
     return f"{v:+.{digits}f}%".replace(".", ",")
+
+
+_MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]
+
+
+def _month_label(iso_date: str) -> str:
+    """"2024-03-07" -> "mar/2024" -- mesmo formato de monthLabel() em
+    apps/web/src/lib/format.ts, só reimplementado em Python."""
+    y, mo = iso_date[:4], int(iso_date[5:7])
+    return f"{_MESES[mo - 1]}/{y}"
 
 
 # ---------------------------------------------------------------- conteudo (HTML)
@@ -307,6 +375,8 @@ def _render_html(
     top_services_month: list[m.ServiceCostDTO],
     top_services_7d: list[m.ServiceCostDTO],
     top_projects: list[m.ProjectCostDTO],
+    all_time_total_brl: float,
+    all_time_since: str | None,
 ) -> str:
     titulo = "Conta inteira" if scope == fsdb.ACCOUNT_SCOPE else (project_name or scope)
     total_7d = sum(p.net_cost_brl for p in last7)
@@ -336,6 +406,11 @@ def _render_html(
                 "Projeção fim de mês",
                 _brl(sc.run_rate_eom_brl),
                 "sem orçamento cadastrado (aba ADM)" if sem_budget else f"{_pct(sc.run_rate_vs_budget_pct * 100)} do orçamento",
+            ),
+            _metric_card(
+                "Custo total (histórico)",
+                _brl(all_time_total_brl),
+                f"desde {_month_label(all_time_since)}" if all_time_since else "sem dados no período",
             ),
         ]
     )
@@ -379,8 +454,22 @@ def _render_html(
             f'style="max-width:420px;width:100%;display:block" />'
         )
 
+    progress_html = ""
+    if not sem_budget:
+        pct_dias = (sc.days_elapsed / sc.days_in_month * 100) if sc.days_in_month else 0.0
+        progress_html = (
+            _progress_bar_html(f"Dias decorridos — {sc.invoice_month}", f"{sc.days_elapsed}/{sc.days_in_month} dias", pct_dias, _INK)
+            + _progress_bar_html("Gasto líquido (MTD) x orçamento mensal", _brl(sc.budget_brl), sc.budget_used_pct * 100, _CHART_NET)
+        )
+
     sections = _section("Visão geral", None, visao_geral)
     sections += _section("Custo nos últimos 7 dias", None, week_card + combo_img)
+    if progress_html:
+        sections += _section(
+            "Ritmo do mês — previsto x realizado",
+            "Compare a barra de dias decorridos com a de orçamento gasto: se a de baixo estiver mais cheia que a de cima, o gasto está correndo mais rápido que o mês.",
+            progress_html,
+        )
     if top_svc_html:
         sections += _section("Top serviços", "Mês corrente e últimos 7 dias.", top_svc_html)
     if top_proj_html:
@@ -477,6 +566,7 @@ def _generate_for_scope(scope: str, cfg: dict) -> tuple[str, dict[str, bytes]]:
     # top projetos só faz sentido na conta inteira -- 1 projeto não compara
     # contra si mesmo.
     top_projects = _top_projects(month_start, today_iso) if scope == fsdb.ACCOUNT_SCOPE else []
+    all_time_total, all_time_since = _all_time_total(project)
 
     charts: dict[str, bytes] = {"combo_7d": _render_combo_chart(last7)}
     if top_services_month:
@@ -499,6 +589,7 @@ def _generate_for_scope(scope: str, cfg: dict) -> tuple[str, dict[str, bytes]]:
     html = _render_html(
         scope, project_name, sc, last7, prev7_total, charts,
         top_services_month, top_services_7d, top_projects,
+        all_time_total, all_time_since,
     )
     return html, charts
 
