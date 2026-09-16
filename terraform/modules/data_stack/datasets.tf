@@ -19,12 +19,24 @@ resource "google_bigquery_dataset" "this" {
   }
 }
 
-# SA do Dataform: escreve em stg/mart/reporting/assertions
+# SA do Dataform: escreve em mart/reporting/assertions (stg tem papel a parte, ver abaixo)
 resource "google_bigquery_dataset_iam_member" "dataform_editor" {
-  for_each   = google_bigquery_dataset.this
+  for_each   = { for k, v in google_bigquery_dataset.this : k => v if k != "stg" }
   project    = var.project_id
   dataset_id = each.value.dataset_id
   role       = "roles/bigquery.dataEditor"
+  member     = "serviceAccount:${var.dataform_sa_email}"
+}
+
+# rpt_label_coverage_by_component/rpt_unlabeled_resources fazem CREATE VIEW em
+# "reporting" consultando "stg" direto (precisam de resource_global_name, que nao
+# sobrevive na mart). O BigQuery exige bigquery.datasets.update em toda dataset
+# referenciada por uma view sendo criada, nao so a de destino -- dataEditor nao
+# cobre isso, so dataOwner.
+resource "google_bigquery_dataset_iam_member" "dataform_owner_stg" {
+  project    = var.project_id
+  dataset_id = google_bigquery_dataset.this["stg"].dataset_id
+  role       = "roles/bigquery.dataOwner"
   member     = "serviceAccount:${var.dataform_sa_email}"
 }
 
