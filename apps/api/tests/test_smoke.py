@@ -91,6 +91,34 @@ def test_me_projects_unrestricted_in_mock():
     assert r.json() == {"unrestricted": True, "projects": []}
 
 
+def test_admins_forbidden_without_admin():
+    r = client.get("/api/adm/admins")
+    assert r.status_code == 403
+
+
+def test_admins_crud_with_dev_force_admin(monkeypatch):
+    from billing_api.config import get_settings
+
+    monkeypatch.setenv("BILLING_API_DEV_FORCE_ADMIN", "1")
+    get_settings.cache_clear()
+    try:
+        r = client.get("/api/adm/admins")
+        assert r.status_code == 200
+        assert r.json() == {
+            "emails": [],
+            "bootstrap_emails": ["matheus.fuzati@dp6.com.br"],
+            "updated_at": None,
+            "updated_by": None,
+        }
+
+        r = client.put("/api/adm/admins", json={"emails": ["victoria.caroline@dp6.com.br"]})
+        assert r.status_code == 200
+        assert r.json()["emails"] == ["victoria.caroline@dp6.com.br"]
+        assert r.json()["bootstrap_emails"] == ["matheus.fuzati@dp6.com.br"]
+    finally:
+        get_settings.cache_clear()
+
+
 def test_project_access_forbidden_without_admin():
     r = client.get("/api/adm/project-access")
     assert r.status_code == 403

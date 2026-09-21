@@ -15,6 +15,7 @@ from . import firestore as fsdb
 from . import models as m
 from .auth import get_caller_email, is_admin_email, require_admin, require_scheduler
 from .bq import mock_active
+from .config import get_settings
 from .project_access import get_authorized_project_ids, is_bypass_principal
 
 log = logging.getLogger("billing_api.adm_routes")
@@ -63,6 +64,23 @@ def me_projects(
         {"ids": sorted(authorized)},
     )
     return m.MeProjectsDTO(unrestricted=False, projects=[m.ProjectDTO(**r) for r in rows])
+
+
+@router.get("/adm/admins", response_model=m.AdminsDTO)
+def list_admins(_: str = Depends(require_admin)) -> m.AdminsDTO:
+    bootstrap = list(get_settings().admin_bootstrap_emails)
+    if mock_active():
+        return m.AdminsDTO(emails=[], bootstrap_emails=bootstrap)
+    return m.AdminsDTO(emails=_fs_or_503(fsdb.get_admins), bootstrap_emails=bootstrap)
+
+
+@router.put("/adm/admins", response_model=m.AdminsDTO)
+def upsert_admins(body: m.AdminsUpdateDTO, actor: str = Depends(require_admin)) -> m.AdminsDTO:
+    emails = [e.strip() for e in body.emails if e.strip() and "@" in e]
+    bootstrap = list(get_settings().admin_bootstrap_emails)
+    if mock_active():
+        return m.AdminsDTO(emails=emails, bootstrap_emails=bootstrap)
+    return m.AdminsDTO(emails=_fs_or_503(fsdb.set_admins, emails, actor), bootstrap_emails=bootstrap)
 
 
 @router.get("/adm/project-access", response_model=list[m.ProjectAccessDTO])

@@ -7,6 +7,15 @@ a assinatura do JWT (X-Goog-IAP-JWT-Assertion) em vez de confiar de olhos
 fechados no header X-Goog-Authenticated-User-Email: é barato e tira qualquer
 dúvida se a config de IAM um dia mudar.
 
+Admin da aba ADM (is_admin_email) é e-mail bootstrap + lista autogerenciável
+no Firestore (firestore.get_admins_or_empty) -- NÃO depende mais do grupo do
+Workspace gcp-dp6-gti@dp6.com.br (decisão de 2026-09-21: a delegação
+domain-wide nunca foi autorizada por um Super Admin, então is_group_member
+sempre falhava fechado pra esse grupo, e nem quem estava nele conseguia
+entrar). O grupo continua existindo em Settings.admin_group_email e sendo
+checado em project_access.is_bypass_principal -- ali é um concern DIFERENTE
+(quem vê custo de todos os projetos), não revogado por esta mudança.
+
 Existe um SEGUNDO deploy, interno, SEM IAP (terraform/environments/prod/
 scheduler.tf) -- o IAP desse projeto usa um OAuth client gerenciado pelo
 Google, que bloqueia por padrão qualquer token OIDC padrão vindo de service
@@ -30,7 +39,7 @@ import logging
 
 from fastapi import Depends, Header, HTTPException
 
-from . import workspace_directory
+from . import firestore as fsdb
 from .config import get_settings
 
 log = logging.getLogger("billing_api.auth")
@@ -99,7 +108,7 @@ def is_admin_email(email: str | None) -> bool:
     e = email.lower()
     if e in {x.lower() for x in s.admin_bootstrap_emails}:
         return True
-    return workspace_directory.is_group_member(s.admin_group_email, e)
+    return e in {x.lower() for x in fsdb.get_admins_or_empty()}
 
 
 def require_admin(email: str | None = Depends(get_caller_email)) -> str:

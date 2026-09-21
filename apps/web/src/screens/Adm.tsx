@@ -2,7 +2,7 @@ import { type CSSProperties, useEffect, useRef, useState } from "react";
 import { DataTable, type DataTableCol, LoadingOrError, PageHeader, Panel } from "../components/ui";
 import { apiDelete, apiPost, apiPut, useApi, useMutationState } from "../lib/api";
 import { brl } from "../lib/format";
-import type { BudgetConfig, Dimensions, ProjectAccess, SendNowResult, SyncBudgetsResult, WeeklyReportConfig } from "../types";
+import type { Admins, BudgetConfig, Dimensions, ProjectAccess, SendNowResult, SyncBudgetsResult, WeeklyReportConfig } from "../types";
 
 const ACCOUNT_SCOPE = "_account";
 
@@ -57,6 +57,78 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <span style={fieldLabel}>{label}</span>
       {children}
     </div>
+  );
+}
+
+/** Quem consegue abrir esta tela (aba ADM). E-mails bootstrap (config do
+ *  backend, break-glass) aparecem como referência, não editáveis aqui --
+ *  a lista autogerenciável é a única coisa que este painel muda. Qualquer
+ *  admin atual pode adicionar ou remover qualquer outro (inclusive a si
+ *  mesmo) -- mesmo espírito simples do "Por pessoa"/"Por grupo" do Atlas. */
+function AdminsPanel() {
+  const admins = useApi<Admins>("/adm/admins");
+  const [emails, setEmails] = useState("");
+  const { loading, error, run } = useMutationState<Admins>();
+
+  useEffect(() => {
+    if (admins.data) setEmails(admins.data.emails.join(", "));
+  }, [admins.data]);
+
+  const save = async () => {
+    const list = emails.split(",").map((e) => e.trim()).filter(Boolean);
+    await run(() => apiPut<Admins>("/adm/admins", { emails: list }));
+  };
+
+  return (
+    <Panel
+      title="Administradores"
+      cap="Quem pode abrir esta aba ADM (inclusive editar esta própria lista). Além destes, os e-mails bootstrap abaixo sempre têm acesso, independente desta lista."
+    >
+      <LoadingOrError loading={admins.loading && !admins.data} error={admins.error} />
+      {admins.data && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {admins.data.bootstrap_emails.length > 0 && (
+            <div>
+              <span style={{ ...fieldLabel, display: "block", marginBottom: 6 }}>
+                Bootstrap · sempre admin, não editável aqui
+              </span>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {admins.data.bootstrap_emails.map((e) => (
+                  <span
+                    key={e}
+                    className="mono"
+                    style={{
+                      fontSize: 12,
+                      padding: "3px 9px",
+                      borderRadius: 999,
+                      background: "var(--muted)",
+                      border: "1px solid var(--border-strong)",
+                    }}
+                  >
+                    {e}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          <Field label="Administradores adicionais (e-mails separados por vírgula)">
+            <input
+              type="text"
+              value={emails}
+              onChange={(e) => setEmails(e.target.value)}
+              placeholder="victoria.caroline@dp6.com.br"
+              style={{ ...inputStyle, minWidth: 340 }}
+            />
+          </Field>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <button type="button" onClick={save} disabled={loading} style={btnStyle}>
+              {loading ? "Salvando…" : "Salvar"}
+            </button>
+            {error && <span style={{ color: "var(--bad)", fontSize: 12.5 }}>{error}</span>}
+          </div>
+        </div>
+      )}
+    </Panel>
   );
 }
 
@@ -793,8 +865,9 @@ export function Adm() {
       <PageHeader
         eyebrow="Restrito"
         title="ADM"
-        desc="Cadastro de orçamento e e-mails responsáveis, acesso por projeto e relatório semanal de custo por e-mail. Grupo gcp-dp6-gti@dp6.com.br, grupo billing@dp6.com.br e matheus.fuzati@dp6.com.br veem o custo de todos os projetos sem precisar de cadastro."
+        desc="Quem administra esta tela, cadastro de orçamento e e-mails responsáveis, acesso por projeto e relatório semanal de custo. Bypass de visualização (vê custo de TODOS os projetos, concern diferente de quem administra esta tela): grupo gcp-dp6-gti@dp6.com.br, grupo billing@dp6.com.br e e-mails bootstrap."
       />
+      <AdminsPanel />
       <LoadingOrError loading={budgets.loading && !budgets.data} error={budgets.error} />
       {/* budgets.data (não "!loading && data") -- depois do 1º carregamento,
           um bump() (toggle, salvar, sincronizar) mantém a tela com o dado
