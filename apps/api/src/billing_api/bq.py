@@ -57,8 +57,14 @@ def query(sql: str, params: dict[str, Any] | None = None) -> list[dict[str, Any]
     from google.api_core.exceptions import Forbidden, NotFound
     from google.cloud import bigquery
 
+    # list/tuple/frozenset -> ArrayQueryParameter (usado pelo filtro "project_id IN
+    # UNNEST(@authorized_project_ids)" de project_access.py) -- só STRING por ora,
+    # unico tipo de coluna filtrada assim hoje.
     job_params = [
-        bigquery.ScalarQueryParameter(k, _bq_type(v), v) for k, v in (params or {}).items()
+        bigquery.ArrayQueryParameter(k, "STRING", list(v))
+        if isinstance(v, list | tuple | frozenset | set)
+        else bigquery.ScalarQueryParameter(k, _bq_type(v), v)
+        for k, v in (params or {}).items()
     ]
     try:
         # labels do job: o BigQuery inclui labels de job no billing export (doc oficial) —

@@ -202,6 +202,20 @@ export interface WaterfallStep {
 export interface Me {
   email: string;
   is_admin: boolean;
+  // vê custo de TODOS os projetos sem estar registrado em nenhum (grupo ADM +
+  // grupo FinOps + bootstrap) -- mais amplo que is_admin (que não inclui FinOps).
+  unrestricted_projects: boolean;
+}
+export interface MeProjects {
+  unrestricted: boolean;
+  projects: Project[];
+}
+export interface ProjectAccess {
+  project_id: string;
+  emails: string[];
+  groups: string[];
+  updated_at: string | null;
+  updated_by: string | null;
 }
 export interface BudgetConfig {
   scope: string; // project_id, ou "_account" (orçamento da conta inteira)

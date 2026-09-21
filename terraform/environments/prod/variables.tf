@@ -34,11 +34,16 @@ variable "api_image" {
   default = "us-docker.pkg.dev/cloudrun/container/hello"
 }
 
-# Grupo dedicado criado pela TI em 2026-09-14 (billing@dp6.com.br) — mesma mudanca do dev
-# (ver comentario em environments/dev/variables.tf). gcp-dp6-gti@ acrescentado pra aba ADM.
+# Domain-wide: qualquer conta @dp6.com.br loga (era so billing@/gcp-dp6-gti@/
+# matheus.fuzati@ -- ver git blame). Seguro ampliar so DEPOIS do ACL por projeto
+# (project_access.py + aba ADM) estar validado em dev e prod: os 3 principals de
+# bypass (project_access.is_bypass_principal) sao exatamente o allowlist antigo,
+# entao ninguem que ja tinha acesso perde nada, e quem entra novo cai direto na
+# tela de "sem projetos liberados" (fail-closed) ate ser cadastrado no ADM.
+# NAO aplicar este apply antes do passo 5 do rollout combinado (ver o plano).
 variable "iap_allowed_members" {
   type    = list(string)
-  default = ["group:billing@dp6.com.br", "user:matheus.fuzati@dp6.com.br", "group:gcp-dp6-gti@dp6.com.br"]
+  default = ["domain:dp6.com.br"]
 }
 
 variable "alert_email" {

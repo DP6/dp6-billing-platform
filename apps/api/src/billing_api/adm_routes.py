@@ -15,6 +15,7 @@ from . import firestore as fsdb
 from . import models as m
 from .auth import get_caller_email, is_admin_email, require_admin, require_scheduler
 from .bq import mock_active
+from .project_access import get_authorized_project_ids, is_bypass_principal
 
 log = logging.getLogger("billing_api.adm_routes")
 
@@ -37,7 +38,55 @@ def _fs_or_503(fn, *args, **kwargs):
 
 @router.get("/me", response_model=m.MeDTO)
 def me(email: str | None = Depends(get_caller_email)) -> m.MeDTO:
-    return m.MeDTO(email=email or "", is_admin=is_admin_email(email))
+    return m.MeDTO(email=email or "", is_admin=is_admin_email(email), unrestricted_projects=is_bypass_principal(email))
+
+
+@router.get("/me/projects", response_model=m.MeProjectsDTO)
+def me_projects(
+    authorized: frozenset[str] | None = Depends(get_authorized_project_ids),
+) -> m.MeProjectsDTO:
+    """Projetos que o caller pode ver -- usado pelo AccessGate do front (tela de
+    boas-vindas / "sem projetos liberados"). unrestricted=true quando authorized
+    is None (bypass); nesse caso `projects` não precisa ser calculado (front usa
+    /dimensions, que já sai completo pra quem é irrestrito)."""
+    if authorized is None:
+        # cobre também o modo mock -- get_authorized_project_ids já devolve None nesse caso.
+        return m.MeProjectsDTO(unrestricted=True, projects=[])
+    if not authorized:
+        return m.MeProjectsDTO(unrestricted=False, projects=[])
+    from .bq import query
+    from .routes import RPT
+
+    rows = query(
+        f"SELECT project_id, ANY_VALUE(project_name) project_name FROM `{RPT}.rpt_cost_daily` "
+        f"WHERE project_id IN UNNEST(@ids) GROUP BY project_id ORDER BY project_name",
+        {"ids": sorted(authorized)},
+    )
+    return m.MeProjectsDTO(unrestricted=False, projects=[m.ProjectDTO(**r) for r in rows])
+
+
+@router.get("/adm/project-access", response_model=list[m.ProjectAccessDTO])
+def list_project_access(_: str = Depends(require_admin)) -> list[m.ProjectAccessDTO]:
+    if mock_active():
+        return []
+    return [m.ProjectAccessDTO(**row) for row in _fs_or_503(fsdb.list_project_access)]
+
+
+@router.put("/adm/project-access/{project_id}", response_model=m.ProjectAccessDTO)
+def upsert_project_access(
+    project_id: str, body: m.ProjectAccessUpsertDTO, actor: str = Depends(require_admin)
+) -> m.ProjectAccessDTO:
+    if mock_active():
+        return m.ProjectAccessDTO(project_id=project_id, emails=body.emails, groups=body.groups)
+    row = _fs_or_503(fsdb.upsert_project_access, project_id, body.emails, body.groups, actor)
+    return m.ProjectAccessDTO(**row)
+
+
+@router.delete("/adm/project-access/{project_id}", status_code=204)
+def delete_project_access(project_id: str, _: str = Depends(require_admin)) -> None:
+    if mock_active():
+        return None
+    _fs_or_503(fsdb.delete_project_access, project_id)
 
 
 @router.get("/adm/budgets", response_model=list[m.BudgetConfigDTO])

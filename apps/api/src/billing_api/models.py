@@ -254,9 +254,39 @@ class WaterfallStepDTO(BaseModel):
 class MeDTO(BaseModel):
     """Identidade do caller (via IAP) + se pertence ao grupo ADM. So isso decide
     se a aba ADM aparece no front -- a garantia de verdade é o require_admin()
-    de cada endpoint /adm/*, nunca esconder a aba sozinho."""
+    de cada endpoint /adm/*, nunca esconder a aba sozinho.
+    unrestricted_projects: vê custo de TODOS os projetos sem precisar estar
+    registrado em nenhum (grupo ADM + grupo FinOps + bootstrap) -- mais
+    amplo que is_admin (que NÃO inclui o grupo FinOps). A garantia de
+    verdade também não é este campo, e sim get_authorized_project_ids em
+    cada endpoint de dado."""
     email: str
     is_admin: bool
+    unrestricted_projects: bool = False
+
+
+class ProjectAccessDTO(BaseModel):
+    """1 linha de project_access/{project_id} no Firestore -- quem pode ver
+    o custo desse projeto (e-mail direto e/ou grupo do Workspace), fora dos
+    3 principals com bypass total (ver project_access.is_bypass_principal)."""
+    project_id: str
+    emails: list[str] = []
+    groups: list[str] = []
+    updated_at: str | None = None
+    updated_by: str | None = None
+
+
+class ProjectAccessUpsertDTO(BaseModel):
+    emails: list[str] = []
+    groups: list[str] = []
+
+
+class MeProjectsDTO(BaseModel):
+    """Projetos que o caller pode ver -- unrestricted=true significa "todos"
+    (o front não precisa nem olhar `projects` nesse caso; ela vem preenchida
+    com o /dimensions sem filtro, só por conveniência)."""
+    unrestricted: bool
+    projects: list[ProjectDTO]
 
 
 class BudgetConfigDTO(BaseModel):

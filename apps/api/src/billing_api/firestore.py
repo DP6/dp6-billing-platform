@@ -2,17 +2,21 @@
 budget/e-mail da aba ADM. Primeiro dado GRAVAVEL deste repo -- tudo o resto
 (rpt_*/mart) e populado read-only pelo Dataform.
 
-Duas filosofias de erro, deliberadamente diferentes:
+Tres filosofias de erro, deliberadamente diferentes:
 - leitura publica (get_budget_or_none, chamada por /budget e /scorecard pra
   QUALQUER usuario, nao só admin) e FAIL-OPEN: Firestore fora do ar nunca
   derruba o dashboard, só faz o caller cair no fallback (Settings.monthly_
   budget_brl) -- mesmo espirito do fail-closed de workspace_directory.py,
   na direcao oposta (aqui "falhar seguro" = continuar mostrando o dashboard).
-- CRUD do ADM (list/upsert/delete/config) e FAIL-LOUD: quem esta editando
-  configuracao precisa de erro honesto, nao sucesso silencioso que na
-  verdade nao gravou nada. adm_routes.py converte a excecao em 503
-  firestore_unavailable, mesmo padrao do 503 data_not_ready que bq.py usa
-  pra erro de BigQuery.
+- CRUD do ADM (list/upsert/delete/config, inclusive de project_access) e
+  FAIL-LOUD: quem esta editando configuracao precisa de erro honesto, nao
+  sucesso silencioso que na verdade nao gravou nada. adm_routes.py converte
+  a excecao em 503 firestore_unavailable, mesmo padrao do 503 data_not_ready
+  que bq.py usa pra erro de BigQuery.
+- leitura de AUTORIZACAO (list_project_access_or_empty, usada só por
+  project_access.py pra decidir quais projetos o caller pode ver) e
+  FAIL-CLOSED -- o oposto do primeiro item: erro aqui nunca pode AMPLIAR
+  acesso, entao vira "nenhum projeto autorizado" em vez de propagar.
 """
 
 from __future__ import annotations
@@ -31,6 +35,7 @@ ACCOUNT_SCOPE = "_account"
 _BUDGETS = "budgets"
 _ADM_CONFIG = "adm_config"
 _WEEKLY_REPORT_DOC = "weekly_report"
+_PROJECT_ACCESS = "project_access"
 
 
 def _get_client():
@@ -208,3 +213,49 @@ def record_report_run(status: str) -> None:
         doc.set({"last_run_at": _now(), "last_run_status": status}, merge=True)
     except Exception:
         log.warning("Falha ao gravar last_run_at/status do relatório semanal", exc_info=True)
+
+
+# ---------------------------------------------------------------- acesso por projeto (ADM)
+
+def list_project_access() -> list[dict[str, Any]]:
+    """Fail-loud (ver docstring do módulo) -- usado só pela aba ADM."""
+    docs = _get_client().collection(_PROJECT_ACCESS).stream()
+    out = []
+    for d in docs:
+        row = d.to_dict()
+        row["project_id"] = d.id
+        row.setdefault("emails", [])
+        row.setdefault("groups", [])
+        out.append(row)
+    out.sort(key=lambda r: r["project_id"])
+    return out
+
+
+def list_project_access_or_empty() -> list[dict[str, Any]]:
+    """Fail-CLOSED -- oposto do fail-open de get_budget_or_none: erro aqui
+    nunca deve ampliar o que o caller vê. Usada só pelo caminho de
+    autorização (project_access.py), nunca pela aba ADM (essa segue
+    fail-loud via list_project_access + _fs_or_503, em adm_routes.py)."""
+    try:
+        return list_project_access()
+    except Exception:
+        log.warning("Firestore indisponível lendo project_access — 0 projetos autorizados", exc_info=True)
+        return []
+
+
+def upsert_project_access(
+    project_id: str, emails: list[str], groups: list[str], actor_email: str
+) -> dict[str, Any]:
+    doc = {
+        "emails": [e.strip().lower() for e in emails if e.strip()],
+        "groups": [g.strip().lower() for g in groups if g.strip()],
+        "updated_at": _now(),
+        "updated_by": actor_email,
+    }
+    _get_client().collection(_PROJECT_ACCESS).document(project_id).set(doc, merge=False)
+    doc["project_id"] = project_id
+    return doc
+
+
+def delete_project_access(project_id: str) -> None:
+    _get_client().collection(_PROJECT_ACCESS).document(project_id).delete()
