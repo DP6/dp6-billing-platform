@@ -1,5 +1,6 @@
 import { HBars } from "../charts/HBars";
 import { DataTable, DrillBar, LoadingOrError, PageHeader, Panel } from "../components/ui";
+import { useAccess } from "../lib/access";
 import { useApi } from "../lib/api";
 import { brl, brlPrecise, dayLabel, num } from "../lib/format";
 import { DRILL_LABEL, type DrillDimension, useDrillFilters } from "../lib/useDrillFilters";
@@ -31,6 +32,7 @@ function topMovers(rows: MonthlyServicePoint[] | undefined): Mover[] {
 }
 
 export function Servicos() {
+  const { unrestricted } = useAccess();
   const [f] = useFilters();
   const { drill, toggle, clear } = useDrillFilters(f);
   const win = resolveWindow(f);
@@ -64,7 +66,8 @@ export function Servicos() {
       />
       <DrillBar entries={drillEntries} onRemove={(dim) => clear(dim as DrillDimension)} onClearAll={() => clear()} />
 
-      {newSkus.data && newSkus.data.length > 0 && (
+      {/* rpt_service_sku não tem project_id -- ver _require_unrestricted em routes.py. */}
+      {unrestricted && newSkus.data && newSkus.data.length > 0 && (
         <Panel
           title="SKUs novos"
           cap={`${newSkus.data.length === 1 ? "1 SKU novo" : `${newSkus.data.length} SKUs novos`} nos últimos 30 dias — sem histórico pra comparar.`}

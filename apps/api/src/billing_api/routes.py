@@ -6,13 +6,14 @@ from __future__ import annotations
 from pathlib import Path
 
 import yaml
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from . import firestore as fsdb
 from . import fixtures as fx
 from . import models as m
 from .bq import mock_active, query
 from .config import get_settings
+from .project_access import get_authorized_project_ids
 
 router = APIRouter(prefix="/api")
 S = get_settings()
@@ -20,35 +21,88 @@ RPT = f"{S.gcp_project}.{S.reporting_dataset}"
 MART = f"{S.gcp_project}.{S.mart_dataset}"
 
 DateStr = str
+Authorized = frozenset[str] | None
 
 
 def _pct_of_total(rows: list[dict], total: float) -> list[dict]:
     return [{**r, "pct_of_total": (r["net_cost_brl"] / total if total else 0.0)} for r in rows]
 
 
+def _project_clause(project: str | None, authorized: Authorized) -> tuple[str, dict]:
+    """Clausula de projeto (SEM "AND" na frente) + params -- authorized é o
+    resultado de get_authorized_project_ids (project_access.py). None =
+    irrestrito (bypass, comportamento de sempre). `project` explícito fora
+    do conjunto autorizado -> 403, nunca um resultado vazio silencioso (uma
+    query "certa" com 0 linhas seria indistinguível de "sem acesso"). Sem
+    `project` explícito e restrito -> filtra pelo conjunto inteiro -- nunca
+    deixa a query sem filtro só porque o usuário não escolheu 1 projeto na
+    FilterBar (esse era o buraco de segurança de antes desta feature)."""
+    if authorized is None:
+        return ("project_id = @project_id", {"project_id": project}) if project else ("", {})
+    if project:
+        if project not in authorized:
+            raise HTTPException(403, {"code": "forbidden_project", "message": "Você não tem acesso a este projeto."})
+        return "project_id = @project_id", {"project_id": project}
+    if not authorized:
+        return "FALSE", {}
+    return "project_id IN UNNEST(@authorized_project_ids)", {"authorized_project_ids": sorted(authorized)}
+
+
+def _project_where(project: str | None, authorized: Authorized) -> tuple[str, dict]:
+    """Mesma coisa que _project_clause, já com " AND " na frente (ou "" sem
+    clausula) -- pros callers que montam a string do WHERE à mão em vez de
+    uma lista (alloc_coverage, alloc_coverage_weekly, anomalies)."""
+    clause, params = _project_clause(project, authorized)
+    return (f" AND {clause}", params) if clause else ("", params)
+
+
 def _scope(
-    service: str | None, environment: str | None, app: str | None, project: str | None = None
+    service: str | None,
+    environment: str | None,
+    app: str | None,
+    project: str | None = None,
+    authorized: Authorized = None,
 ) -> tuple[str, dict]:
     """Clausula WHERE de recorte (serviço/ambiente/app/projeto) para as views rpt_*.
-    Devolve ("" ou " AND ...", params)."""
+    Devolve ("" ou " AND ...", params). `authorized`: ver _project_clause."""
     clauses, params = [], {}
     for col, val in (
         ("service_description", service),
         ("label_environment", environment),
         ("label_app", app),
-        ("project_id", project),
     ):
         if val:
             clauses.append(f"{col} = @{col}")
             params[col] = val
+    proj_clause, proj_params = _project_clause(project, authorized)
+    if proj_clause:
+        clauses.append(proj_clause)
+    params.update(proj_params)
     return (" AND " + " AND ".join(clauses) if clauses else "", params)
+
+
+def _require_unrestricted(authorized: Authorized) -> None:
+    """Gate das views que ainda não têm grão de projeto (rpt_forecast_monthly,
+    rpt_label_coverage_by_component, rpt_unlabeled_resources, rpt_commitment_coverage,
+    rpt_unit_economics, rpt_savings_waterfall, rpt_service_sku, rpt_budget_daily e a
+    agregação de chargeback-readiness) -- restringir de verdade exigiria mudar o
+    Dataform (fora de escopo agora). Decisão: bloquear pra quem não tem bypass, em vez
+    de continuar mostrando o número da conta inteira pra quem só devia ver 1 projeto."""
+    if authorized is not None:
+        raise HTTPException(
+            403,
+            {
+                "code": "account_wide_only",
+                "message": "Esta visão ainda é sempre da conta inteira — disponível só para quem tem acesso a todos os projetos.",
+            },
+        )
 
 
 def _has_scope(service: str | None, environment: str | None, app: str | None, project: str | None = None) -> bool:
     return bool(service or environment or app or project)
 
 
-def _effective_budget_brl(project: str | None) -> float | None:
+def _effective_budget_brl(project: str | None, authorized: Authorized = None) -> float | None:
     """Budget por escopo (aba ADM, Firestore) -- fica ao vivo (sem o lag do
     cron diário do Dataform), e nenhuma view .sqlx precisa mudar pra isso
     funcionar. None quando NINGUÉM cadastrou orçamento pra esse escopo ainda
@@ -57,9 +111,15 @@ def _effective_budget_brl(project: str | None) -> float | None:
     callers tratam None como "sem orçamento": os %/thresholds zeram (todo
     `if budget else 0.0` já trata None como falsy) e o front mostra "sem
     orçamento cadastrado" em vez de um número inventado.
+    Restrito (authorized não-None) SEM projeto explícito -> também None: não
+    existe orçamento cadastrado pra "soma dos projetos autorizados deste
+    usuário" (budgets/ é por 1 projeto ou "_account"), e usar o orçamento da
+    CONTA aqui vazaria esse número pra quem só devia ver um subconjunto.
     Em modo mock mantém a constante -- é dado de demonstração, não dado real."""
     if mock_active():
         return S.monthly_budget_brl
+    if authorized is not None and not project:
+        return None
     cfg = fsdb.get_budget_or_none(project or fsdb.ACCOUNT_SCOPE)
     return float(cfg["budget_brl"]) if cfg else None
 
@@ -96,26 +156,35 @@ def meta() -> m.MetaDTO:
 
 
 @router.get("/dimensions", response_model=m.DimensionsDTO)
-def dimensions() -> m.DimensionsDTO:
-    """Valores das listas de filtro (Serviço/Ambiente/App/Projeto) + frescor."""
+def dimensions(authorized: Authorized = Depends(get_authorized_project_ids)) -> m.DimensionsDTO:
+    """Valores das listas de filtro (Serviço/Ambiente/App/Projeto) + frescor.
+    `projects` já sai filtrado pelo conjunto autorizado do caller -- é dessa
+    lista que a FilterBar/ADM montam os dropdowns, então nenhuma tela
+    precisa de lógica extra pra respeitar o ACL por projeto."""
     if mock_active():
         return m.DimensionsDTO(**fx.DIMENSIONS)
-    services = [r["v"] for r in query(
-        f"SELECT DISTINCT service_description v FROM `{RPT}.rpt_cost_daily` "
-        f"WHERE service_description IS NOT NULL ORDER BY 1"
-    )]
-    environments = [r["v"] for r in query(
-        f"SELECT DISTINCT label_environment v FROM `{RPT}.rpt_cost_daily` "
-        f"WHERE label_environment IS NOT NULL AND label_environment != '' ORDER BY 1"
-    )]
-    apps = [r["v"] for r in query(
-        f"SELECT DISTINCT label_app v FROM `{RPT}.rpt_cost_daily` "
-        f"WHERE label_app IS NOT NULL AND label_app != '' ORDER BY 1"
-    )]
-    project_rows = query(
-        f"SELECT project_id, ANY_VALUE(project_name) project_name FROM `{RPT}.rpt_cost_daily` "
-        f"WHERE project_id IS NOT NULL GROUP BY project_id ORDER BY project_name"
-    )
+    if authorized is not None and not authorized:
+        # 0 projetos liberados -- nem vale a pena tocar o BigQuery.
+        services, environments, apps, project_rows = [], [], [], []
+    else:
+        services = [r["v"] for r in query(
+            f"SELECT DISTINCT service_description v FROM `{RPT}.rpt_cost_daily` "
+            f"WHERE service_description IS NOT NULL ORDER BY 1"
+        )]
+        environments = [r["v"] for r in query(
+            f"SELECT DISTINCT label_environment v FROM `{RPT}.rpt_cost_daily` "
+            f"WHERE label_environment IS NOT NULL AND label_environment != '' ORDER BY 1"
+        )]
+        apps = [r["v"] for r in query(
+            f"SELECT DISTINCT label_app v FROM `{RPT}.rpt_cost_daily` "
+            f"WHERE label_app IS NOT NULL AND label_app != '' ORDER BY 1"
+        )]
+        proj_where, proj_params = _project_where(None, authorized)
+        project_rows = query(
+            f"SELECT project_id, ANY_VALUE(project_name) project_name FROM `{RPT}.rpt_cost_daily` "
+            f"WHERE project_id IS NOT NULL {proj_where} GROUP BY project_id ORDER BY project_name",
+            proj_params,
+        )
     fr = _freshness()
     return m.DimensionsDTO(
         services=services,
@@ -137,15 +206,21 @@ def scorecard(
     project: str | None = None,
     from_: DateStr | None = Query(default=None, alias="from"),
     to: DateStr | None = None,
+    authorized: Authorized = Depends(get_authorized_project_ids),
 ) -> m.ScorecardDTO:
     """Sem from/to e sem recorte -> caminho rapido pela view (MTD do mes corrente).
     Com from/to -> os campos de custo/creditos/economia passam a ser a soma na janela
     e prev_month_net_brl vira o total da janela anterior de mesmo tamanho. run_rate/budget
-    continuam MTD (o front nao os usa no bloco "periodo"; /budget chama sem from/to)."""
+    continuam MTD (o front nao os usa no bloco "periodo"; /budget chama sem from/to).
+
+    `authorized` tem default Depends(...) só pra funcionar como rota HTTP normal --
+    budget() abaixo chama esta função DIRETO (não via HTTP) e sempre passa seu
+    próprio `authorized` já resolvido explicitamente, então o Depends nunca entra
+    em ação nesse caminho (Python usa o valor passado, não o default)."""
     if mock_active():
         return m.ScorecardDTO(**fx.SCORECARD)
 
-    where, params = _scope(service, environment, app, project)
+    where, params = _scope(service, environment, app, project, authorized)
 
     # sempre precisamos do MTD para run_rate/budget/dias
     mtd = query(f"""
@@ -165,7 +240,7 @@ def scorecard(
     days_elapsed = int(cal["days_elapsed"] or 1) or 1
     days_in_month = int(cal["days_in_month"] or 30)
     run_rate = net_mtd / days_elapsed * days_in_month
-    budget = _effective_budget_brl(project)
+    budget = _effective_budget_brl(project, authorized)
 
     if from_ and to:
         win = query(f"""
@@ -185,7 +260,10 @@ def scorecard(
         credits = float(win["credits"] or 0.0)
         net_usd = float(win["net_usd"] or 0.0)
         net_prev = float(prev["net"] or 0.0)
-    elif not _has_scope(service, environment, app, project):
+    elif authorized is None and not _has_scope(service, environment, app, project):
+        # rpt_cost_scorecard é conta inteira, pré-agregada -- só pra quem tem bypass
+        # (authorized is None). Restrito sem recorte cai no ramo "else" abaixo, que
+        # já usa `where`/`params` com o filtro de projetos autorizados embutido.
         r = query(f"SELECT * FROM `{RPT}.rpt_cost_scorecard`")[0]
         # rpt_cost_scorecard traz budget_brl/budget_used_pct/run_rate_vs_budget_pct
         # compilados com a constante velha do Dataform (nenhum .sqlx muda pra
@@ -231,6 +309,7 @@ def cost_daily(
     from_: DateStr = Query(alias="from"), to: DateStr = Query(...),
     service: str | None = None, environment: str | None = None, app: str | None = None,
     project: str | None = None,
+    authorized: Authorized = Depends(get_authorized_project_ids),
 ) -> list[m.DailyPointDTO]:
     if mock_active():
         pts = [p for p in fx.daily_points() if from_ <= p["usage_date"] <= to]
@@ -239,11 +318,15 @@ def cost_daily(
     params: dict = {"from": from_, "to": to}
     for col, val in (
         ("service_description", service), ("label_environment", environment),
-        ("label_app", app), ("project_id", project),
+        ("label_app", app),
     ):
         if val:
             where.append(f"{col} = @{col}")
             params[col] = val
+    proj_clause, proj_params = _project_clause(project, authorized)
+    if proj_clause:
+        where.append(proj_clause)
+        params.update(proj_params)
     rows = query(f"""
         WITH d AS (
           SELECT usage_date, SUM(net_cost_brl) net_cost_brl, SUM(net_cost_usd) net_cost_usd
@@ -267,6 +350,7 @@ def cost_series(
     environment: str | None = None,
     app: str | None = None,
     project: str | None = None,
+    authorized: Authorized = Depends(get_authorized_project_ids),
 ) -> list[m.CostSeriesPointDTO]:
     """Serie temporal em formato longo: barras por periodo, opcionalmente empilhadas.
     grain=day -> rpt_cost_daily; grain=month -> rpt_cost_monthly."""
@@ -297,7 +381,7 @@ def cost_series(
                 out.append(m.CostSeriesPointDTO(period=b["period"], key=k, net_cost_brl=round(b["v"] * w[i], 4)))
         return out
 
-    where, params = _scope(service, environment, app, project)
+    where, params = _scope(service, environment, app, project, authorized)
     if grain == "month":
         period_sql = "invoice_month"
         src = f"`{RPT}.rpt_cost_monthly`"
@@ -323,12 +407,13 @@ def cost_series(
 def cost_by_service(
     from_: DateStr = Query(alias="from"), to: DateStr = Query(...),
     environment: str | None = None, app: str | None = None, project: str | None = None,
+    authorized: Authorized = Depends(get_authorized_project_ids),
 ) -> list[m.ServiceCostDTO]:
     if mock_active():
         total = sum(v for _, v in fx.SERVICES)
         return [m.ServiceCostDTO(service_description=s, net_cost_brl=v, pct_of_total=v / total)
                 for s, v in fx.SERVICES]
-    where, params = _scope(None, environment, app, project)
+    where, params = _scope(None, environment, app, project, authorized)
     rows = query(f"""
         SELECT service_description, SUM(net_cost_brl) net_cost_brl
         FROM `{RPT}.rpt_cost_daily` WHERE usage_date BETWEEN @from AND @to {where}
@@ -344,12 +429,16 @@ def cost_by_service(
 def cost_by_project(
     from_: DateStr = Query(alias="from"), to: DateStr = Query(...),
     service: str | None = None, environment: str | None = None, app: str | None = None,
+    authorized: Authorized = Depends(get_authorized_project_ids),
 ) -> list[m.ProjectCostDTO]:
+    """Sem parâmetro `project` (é o breakdown POR projeto) -- aplica o filtro de
+    autorização incondicionalmente via _scope(..., project=None, authorized), que já
+    sabe filtrar pelo conjunto inteiro do caller quando restrito."""
     if mock_active():
         total = sum(v for _, v in fx.PROJECTS)
         return [m.ProjectCostDTO(project_id=pid, project_name=pid, net_cost_brl=v, pct_of_total=v / total)
                 for pid, v in fx.PROJECTS]
-    where, params = _scope(service, environment, app)
+    where, params = _scope(service, environment, app, None, authorized)
     rows = query(f"""
         SELECT IFNULL(project_id, '(sem projeto)') AS project_id,
                IFNULL(ANY_VALUE(project_name), '(sem projeto)') AS project_name,
@@ -375,6 +464,7 @@ def cost_by_project(
 def cost_monthly(
     from_: DateStr | None = Query(default=None, alias="from"), to: DateStr | None = None,
     environment: str | None = None, app: str | None = None, project: str | None = None,
+    authorized: Authorized = Depends(get_authorized_project_ids),
 ) -> list[m.MonthlyServicePointDTO]:
     if mock_active():
         out = []
@@ -382,7 +472,7 @@ def cost_monthly(
             out += [m.MonthlyServicePointDTO(invoice_month=ym, service_description=s, net_cost_brl=v)
                     for s, v in (("Cloud Run", cr), ("BigQuery", bq), ("Outros", ot)) if v]
         return out
-    where, params = _scope(None, environment, app, project)
+    where, params = _scope(None, environment, app, project, authorized)
     if from_ and to:
         where += " AND invoice_month_date BETWEEN DATE_TRUNC(@from, MONTH) AND @to"
         params = {**params, "from": from_, "to": to}
@@ -399,12 +489,13 @@ def reconciliation(
     environment: str | None = None,
     app: str | None = None,
     project: str | None = None,
+    authorized: Authorized = Depends(get_authorized_project_ids),
 ) -> list[m.ReconRowDTO]:
     if mock_active():
         return [m.ReconRowDTO(invoice_month=ym, gross_cost_brl=g, credits_total_brl=cr,
                               net_cost_brl=n, matches_invoice=True)
                 for ym, _, _, _, g, cr, n in fx.MONTHS]
-    where, params = _scope(service, environment, app, project)
+    where, params = _scope(service, environment, app, project, authorized)
     rows = query(f"""
         SELECT invoice_month, SUM(gross_cost_brl) gross_cost_brl,
                SUM(credits_total_brl) credits_total_brl, SUM(net_cost_brl) net_cost_brl
@@ -421,14 +512,20 @@ def budget(
     environment: str | None = None,
     app: str | None = None,
     project: str | None = None,
+    authorized: Authorized = Depends(get_authorized_project_ids),
 ) -> m.BudgetDTO:
-    sc = scorecard(service, environment, app, project)
-    bud = _effective_budget_brl(project)
+    # scorecard() é chamada DIRETO (não via HTTP) -- passar authorized= explícito
+    # ignora o Depends(...) default dela (Python usa o valor passado), e propaga o
+    # 403 de _project_clause se `project` estiver fora do conjunto autorizado.
+    sc = scorecard(service, environment, app, project, authorized=authorized)
+    bud = _effective_budget_brl(project, authorized)
     thresholds = [m.ThresholdDTO(pct=p, value_brl=bud * p) for p in S.budget_thresholds] if bud else []
     breach: str | None = None
     # rpt_budget_daily não tem project_id (é só conta inteira) -- comparar a
     # curva dela contra o budget de 1 projeto não faz sentido, então pula.
     # Sem orçamento cadastrado (bud is None) também pula -- nada pra estourar.
+    # bud já é None pra restrito sem `project` explícito (_effective_budget_brl),
+    # então esse "bud is None" também cobre esse caso, sem vazar a curva da conta.
     if mock_active() or project or bud is None:
         rows = []
     else:
@@ -450,7 +547,11 @@ def budget(
 
 
 @router.get("/budget/burndown", response_model=list[m.BurndownPointDTO])
-def burndown(month: str | None = None) -> list[m.BurndownPointDTO]:
+def burndown(
+    month: str | None = None, authorized: Authorized = Depends(get_authorized_project_ids)
+) -> list[m.BurndownPointDTO]:
+    # rpt_budget_daily não tem project_id (conta inteira) -- ver _require_unrestricted.
+    _require_unrestricted(authorized)
     if mock_active():
         cum, out = 0.0, []
         for p in fx.daily_points():
@@ -479,9 +580,13 @@ def forecast(
     environment: str | None = None,
     app: str | None = None,
     project: str | None = None,
+    authorized: Authorized = Depends(get_authorized_project_ids),
 ) -> list[m.ForecastMonthDTO]:
     # rpt_forecast_monthly nao tem grao de serviço/label/projeto — a previsao fica conta-inteira
-    # por ora (os params sao aceitos para uniformidade da FilterBar). Ver specs/004.
+    # por ora (os params sao aceitos para uniformidade da FilterBar). Ver specs/004 e
+    # _require_unrestricted (bloqueia pra quem não tem bypass -- vazaria custo da conta
+    # inteira pra quem só devia ver 1 projeto).
+    _require_unrestricted(authorized)
     _ = (service, environment, app, project)
     if mock_active():
         return [
@@ -504,15 +609,16 @@ def forecast(
 # ---------------------------------------------------------------- allocation
 
 @router.get("/allocation/coverage", response_model=list[m.LabelCoverageDTO])
-def alloc_coverage(months: int = 3, project: str | None = None) -> list[m.LabelCoverageDTO]:
+def alloc_coverage(
+    months: int = 3, project: str | None = None, authorized: Authorized = Depends(get_authorized_project_ids)
+) -> list[m.LabelCoverageDTO]:
     """`rpt_label_coverage` tem grao invoice_month x project_id — sem `project`, agrega
-    (soma os numeradores/denominador) de volta pra conta inteira em vez de devolver
-    uma linha arbitraria por projeto."""
+    (soma os numeradores/denominador) de volta pra conta inteira (ou pro conjunto
+    autorizado do caller, se restrito) em vez de devolver uma linha arbitraria por
+    projeto."""
     if mock_active():
         return [m.LabelCoverageDTO(**c) for c in fx.COVERAGE]
-    where, params = ("", {})
-    if project:
-        where, params = " AND project_id = @project", {"project": project}
+    where, params = _project_where(project, authorized)
     rows = query(f"""
         SELECT invoice_month,
                SAFE_DIVIDE(SUM(net_cost_with_app_brl), SUM(net_cost_total_brl)) pct_app,
@@ -529,15 +635,14 @@ def alloc_coverage(months: int = 3, project: str | None = None) -> list[m.LabelC
 def alloc_coverage_weekly(
     from_: DateStr | None = Query(default=None, alias="from"), to: DateStr | None = None,
     project: str | None = None,
+    authorized: Authorized = Depends(get_authorized_project_ids),
 ) -> list[m.CoverageWeekDTO]:
     """`rpt_label_coverage_weekly` tem grao week_start x project_id e so expoe as fracoes
     (nao os numeradores) — reconstroi o numerador como pct * net_cost_week_brl (exato, ja
     que foi assim que a view calculou o pct) pra poder agregar entre projetos sem `project`."""
     if mock_active():
         return [m.CoverageWeekDTO(**w) for w in fx.COVERAGE_WEEKLY]
-    where, params = ("", {})
-    if project:
-        where, params = " AND project_id = @project", {"project": project}
+    where, params = _project_where(project, authorized)
     rows = query(f"""
         SELECT CAST(week_start AS STRING) week_start,
                SAFE_DIVIDE(SUM(pct_app * net_cost_week_brl), SUM(net_cost_week_brl)) pct_app,
@@ -556,11 +661,15 @@ def alloc_coverage_weekly(
 
 
 @router.get("/allocation/coverage/by-component", response_model=list[m.ComponentLabelCoverageDTO])
-def alloc_coverage_by_component() -> list[m.ComponentLabelCoverageDTO]:
+def alloc_coverage_by_component(
+    authorized: Authorized = Depends(get_authorized_project_ids),
+) -> list[m.ComponentLabelCoverageDTO]:
     """Cobertura por RECURSO (não por custo) — só componentes onde label é aplicável de
     verdade (Cloud Run, Secret Manager; BigQuery fica de fora — ver includes/constants.js).
     "(geral)" é a agregação, conta inteira. Independe do que rodou/custou cada recurso.
-    TODO: aceitar `project` (view hoje agrega a conta inteira)."""
+    TODO: aceitar `project` (view hoje agrega a conta inteira) -- até lá, ver
+    _require_unrestricted."""
+    _require_unrestricted(authorized)
     if mock_active():
         return [m.ComponentLabelCoverageDTO(**c) for c in fx.COVERAGE_BY_COMPONENT]
     rows = query(f"""
@@ -572,9 +681,13 @@ def alloc_coverage_by_component() -> list[m.ComponentLabelCoverageDTO]:
 
 
 @router.get("/allocation/coverage/unlabeled-resources", response_model=list[m.UnlabeledResourceDTO])
-def alloc_unlabeled_resources() -> list[m.UnlabeledResourceDTO]:
+def alloc_unlabeled_resources(
+    authorized: Authorized = Depends(get_authorized_project_ids),
+) -> list[m.UnlabeledResourceDTO]:
     """Detalhamento acionável do endpoint acima: 1 linha por recurso com >=1 label faltando,
-    ordenado por custo — pra aplicar o label na origem (Terraform/gcloud), não no billing."""
+    ordenado por custo — pra aplicar o label na origem (Terraform/gcloud), não no billing.
+    Sem project_id na view -- ver _require_unrestricted."""
+    _require_unrestricted(authorized)
     if mock_active():
         return [m.UnlabeledResourceDTO(**r) for r in fx.UNLABELED_RESOURCES]
     rows = query(f"""
@@ -590,6 +703,7 @@ def alloc_unlabeled_resources() -> list[m.UnlabeledResourceDTO]:
 def alloc_by_app(
     from_: DateStr = Query(alias="from"), to: DateStr = Query(...),
     service: str | None = None, environment: str | None = None, project: str | None = None,
+    authorized: Authorized = Depends(get_authorized_project_ids),
 ) -> m.AppAllocationDTO:
     if mock_active():
         return m.AppAllocationDTO(**fx.ALLOC_BY_APP)
@@ -609,9 +723,10 @@ def alloc_by_app(
     if environment:
         where.append("label_environment_reconciled = @label_environment_reconciled")
         params["label_environment_reconciled"] = environment
-    if project:
-        where.append("project_id = @project_id")
-        params["project_id"] = project
+    proj_clause, proj_params = _project_clause(project, authorized)
+    if proj_clause:
+        where.append(proj_clause)
+        params.update(proj_params)
     where_sql = " AND ".join(where)
     rows = query(f"""
         SELECT label_app_reconciled AS label_app, SUM(net_cost_brl) net_cost_brl
@@ -638,6 +753,7 @@ def alloc_by_app(
 def alloc_by_env(
     from_: DateStr = Query(alias="from"), to: DateStr = Query(...),
     service: str | None = None, app: str | None = None, project: str | None = None,
+    authorized: Authorized = Depends(get_authorized_project_ids),
 ) -> m.EnvAllocationDTO:
     if mock_active():
         rows = [m.EnvCostDTO(**e) for e in fx.ALLOC_BY_ENV]
@@ -654,9 +770,10 @@ def alloc_by_env(
     if app:
         where.append("label_app_reconciled = @label_app_reconciled")
         params["label_app_reconciled"] = app
-    if project:
-        where.append("project_id = @project_id")
-        params["project_id"] = project
+    proj_clause, proj_params = _project_clause(project, authorized)
+    if proj_clause:
+        where.append(proj_clause)
+        params.update(proj_params)
     where_sql = " AND ".join(where)
     rows_raw = query(f"""
         SELECT label_environment_reconciled AS label_environment, SUM(net_cost_brl) net_cost_brl
@@ -682,7 +799,12 @@ def alloc_by_env(
 
 
 @router.get("/allocation/chargeback-readiness", response_model=m.ChargebackReadinessDTO)
-def chargeback_readiness() -> m.ChargebackReadinessDTO:
+def chargeback_readiness(
+    authorized: Authorized = Depends(get_authorized_project_ids),
+) -> m.ChargebackReadinessDTO:
+    # agregação já é conta inteira (mês mais recente, sem WHERE de projeto) -- ver
+    # _require_unrestricted.
+    _require_unrestricted(authorized)
     if mock_active():
         return m.ChargebackReadinessDTO(**fx.CHARGEBACK)
     # rpt_label_coverage tem grao invoice_month x project_id — agrega de volta pra conta
@@ -706,13 +828,14 @@ def cost_by_sku(
     from_: DateStr = Query(alias="from"), to: DateStr = Query(...),
     service: str | None = None, environment: str | None = None, app: str | None = None,
     project: str | None = None,
+    authorized: Authorized = Depends(get_authorized_project_ids),
 ) -> list[m.SkuCostDTO]:
     if mock_active():
         return [m.SkuCostDTO(service_description=s, sku_description=k, pricing_unit=u,
                              net_cost_brl=c, usage_qty=q, unit_cost_brl=uc)
                 for s, k, u, c, q, uc in fx.SKU_COST
                 if not service or s == service]
-    scope_where, params = _scope(service, environment, app, project)
+    scope_where, params = _scope(service, environment, app, project, authorized)
     where = ["usage_date BETWEEN @from AND @to"]
     params = {**params, "from": from_, "to": to}
     rows = query(f"""
@@ -730,7 +853,9 @@ def cost_by_sku(
 
 
 @router.get("/sku/new", response_model=list[m.NewSkuDTO])
-def sku_new() -> list[m.NewSkuDTO]:
+def sku_new(authorized: Authorized = Depends(get_authorized_project_ids)) -> list[m.NewSkuDTO]:
+    # rpt_service_sku não tem project_id -- ver _require_unrestricted.
+    _require_unrestricted(authorized)
     if mock_active():
         return [m.NewSkuDTO(**s) for s in fx.NEW_SKUS]
     rows = query(f"""
@@ -743,7 +868,9 @@ def sku_new() -> list[m.NewSkuDTO]:
 # ---------------------------------------------------------------- optimization
 
 @router.get("/optimization/commitment-coverage", response_model=m.CommitmentCoverageDTO)
-def commitment_coverage() -> m.CommitmentCoverageDTO:
+def commitment_coverage(authorized: Authorized = Depends(get_authorized_project_ids)) -> m.CommitmentCoverageDTO:
+    # rpt_commitment_coverage não tem project_id -- ver _require_unrestricted.
+    _require_unrestricted(authorized)
     if mock_active():
         return m.CommitmentCoverageDTO(**fx.COMMITMENT)
     r = query(f"SELECT * FROM `{RPT}.rpt_commitment_coverage`")[0]
@@ -765,7 +892,9 @@ def recommendations() -> m.RecommendationsDTO:
 # ---------------------------------------------------------------- unit economics
 
 @router.get("/unit-economics", response_model=m.UnitEconomicsDTO)
-def unit_economics() -> m.UnitEconomicsDTO:
+def unit_economics(authorized: Authorized = Depends(get_authorized_project_ids)) -> m.UnitEconomicsDTO:
+    # rpt_unit_economics não tem project_id -- ver _require_unrestricted.
+    _require_unrestricted(authorized)
     if mock_active():
         return m.UnitEconomicsDTO(**fx.UNIT_ECON)
     r = query(f"SELECT * FROM `{RPT}.rpt_unit_economics`")[0]
@@ -780,7 +909,10 @@ def unit_economics() -> m.UnitEconomicsDTO:
 @router.get("/unit-economics/series", response_model=list[m.UnitSeriesPointDTO])
 def unit_economics_series(
     metric: str = "cost_per_1k_req", from_: DateStr = Query(alias="from"), to: DateStr = Query(...),
+    authorized: Authorized = Depends(get_authorized_project_ids),
 ) -> list[m.UnitSeriesPointDTO]:
+    # query abaixo é conta inteira, sem WHERE de projeto -- ver _require_unrestricted.
+    _require_unrestricted(authorized)
     if mock_active():
         return [m.UnitSeriesPointDTO(usage_date=p["usage_date"], value_brl=0.0006)
                 for p in fx.daily_points() if from_ <= p["usage_date"] <= to][-10:]
@@ -795,11 +927,15 @@ def unit_economics_series(
 
 
 @router.get("/efficiency/waterfall", response_model=list[m.WaterfallStepDTO])
-def efficiency_waterfall(period: str | None = None) -> list[m.WaterfallStepDTO]:
+def efficiency_waterfall(
+    period: str | None = None, authorized: Authorized = Depends(get_authorized_project_ids)
+) -> list[m.WaterfallStepDTO]:
     """Devolve os degraus (start/decrease/end) + a linha meta '_cost_avoided_brl' (desconto
     negociado + créditos, já calculada em rpt_savings_waterfall) — só '_effective_savings_pct'
     fica de fora. O front usa '_cost_avoided_brl' pro card "Custo evitado" e descarta o resto
-    de kind=meta antes de desenhar o waterfall (ver Waterfall.tsx/shape())."""
+    de kind=meta antes de desenhar o waterfall (ver Waterfall.tsx/shape()).
+    rpt_savings_waterfall não tem project_id -- ver _require_unrestricted."""
+    _require_unrestricted(authorized)
     if mock_active():
         return [m.WaterfallStepDTO(**s) for s in fx.WATERFALL]
     rows = query(f"SELECT step label, kind, value_brl FROM `{RPT}.rpt_savings_waterfall` "
@@ -813,12 +949,11 @@ def efficiency_waterfall(period: str | None = None) -> list[m.WaterfallStepDTO]:
 def anomalies(
     from_: DateStr | None = Query(default=None, alias="from"), to: DateStr | None = None,
     project: str | None = None,
+    authorized: Authorized = Depends(get_authorized_project_ids),
 ) -> list[m.AnomalyRowDTO]:
     if mock_active():
         return [m.AnomalyRowDTO(**a) for a in fx.ANOMALIES]
-    where, params = ("", {})
-    if project:
-        where, params = " AND project_id = @project", {"project": project}
+    where, params = _project_where(project, authorized)
     rows = query(f"""
         SELECT CAST(usage_date AS STRING) usage_date, project_id, project_name, service_description,
                net_cost_day_brl AS net_cost_brl, avg_28d_brl, z_score,

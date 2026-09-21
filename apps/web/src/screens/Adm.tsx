@@ -2,7 +2,7 @@ import { type CSSProperties, useEffect, useRef, useState } from "react";
 import { DataTable, type DataTableCol, LoadingOrError, PageHeader, Panel } from "../components/ui";
 import { apiDelete, apiPost, apiPut, useApi, useMutationState } from "../lib/api";
 import { brl } from "../lib/format";
-import type { BudgetConfig, Dimensions, SendNowResult, SyncBudgetsResult, WeeklyReportConfig } from "../types";
+import type { BudgetConfig, Dimensions, ProjectAccess, SendNowResult, SyncBudgetsResult, WeeklyReportConfig } from "../types";
 
 const ACCOUNT_SCOPE = "_account";
 
@@ -629,6 +629,159 @@ function WeeklyReportPanel({ budgets, bump }: { budgets: BudgetConfig[]; bump: (
   );
 }
 
+/** Form de 1 linha de project_access/{project_id} -- e-mails/grupos separados
+ *  por vírgula, mesmo padrão de entrada do BudgetForm (mas sem valor
+ *  monetário: só listas de principals). */
+function ProjectAccessForm({
+  projectId,
+  initial,
+  onSaved,
+}: {
+  projectId: string;
+  initial?: ProjectAccess;
+  onSaved: () => void;
+}) {
+  const [emails, setEmails] = useState((initial?.emails ?? []).join(", "));
+  const [groups, setGroups] = useState((initial?.groups ?? []).join(", "));
+  const { loading, error, run } = useMutationState<ProjectAccess>();
+
+  useEffect(() => {
+    setEmails((initial?.emails ?? []).join(", "));
+    setGroups((initial?.groups ?? []).join(", "));
+  }, [initial]);
+
+  const save = async () => {
+    await run(() =>
+      apiPut<ProjectAccess>(`/adm/project-access/${encodeURIComponent(projectId)}`, {
+        emails: emails.split(",").map((e) => e.trim()).filter(Boolean),
+        groups: groups.split(",").map((g) => g.trim()).filter(Boolean),
+      }),
+    );
+    onSaved();
+  };
+
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: "10px 16px" }}>
+      <Field label="E-mails diretos (separados por vírgula)">
+        <input
+          type="text"
+          value={emails}
+          onChange={(e) => setEmails(e.target.value)}
+          placeholder="fulano@dp6.com.br, ciclana@dp6.com.br"
+          style={{ ...inputStyle, minWidth: 280 }}
+        />
+      </Field>
+      <Field label="Grupos do Workspace (separados por vírgula)">
+        <input
+          type="text"
+          value={groups}
+          onChange={(e) => setGroups(e.target.value)}
+          placeholder="time-x@dp6.com.br"
+          style={{ ...inputStyle, minWidth: 240 }}
+        />
+      </Field>
+      <button type="button" onClick={save} disabled={loading} style={btnStyle}>
+        {loading ? "Salvando…" : "Salvar"}
+      </button>
+      {error && <span style={{ color: "var(--bad)", fontSize: 12.5 }}>{error}</span>}
+    </div>
+  );
+}
+
+/** Quem pode ver o custo de cada projeto (aba ADM) -- e-mail direto e/ou grupo do
+ *  Workspace, checado via project_access.py no backend. Grupo ADM (gcp-dp6-gti@),
+ *  grupo FinOps (billing@) e o e-mail bootstrap NÃO precisam estar aqui -- eles têm
+ *  bypass total (ver PageHeader.desc). */
+function ProjectAccessPanel({ dims }: { dims: Dimensions | undefined }) {
+  const [reloadKey, setReloadKey] = useState(0);
+  const bump = () => setReloadKey((k) => k + 1);
+  const access = useApi<ProjectAccess[]>("/adm/project-access", { _r: String(reloadKey) });
+  const [editing, setEditing] = useState<string | null>(null);
+
+  const configuredIds = new Set((access.data ?? []).map((a) => a.project_id));
+  const newCandidates = (dims?.projects ?? []).filter((p) => !configuredIds.has(p.project_id));
+  const projectName = (id: string) => dims?.projects.find((p) => p.project_id === id)?.project_name ?? id;
+
+  const del = useMutationState<void>();
+  const remove = async (projectId: string) => {
+    if (!confirm(`Remover o acesso cadastrado para ${projectName(projectId)}? Ninguém sem bypass verá mais este projeto.`)) return;
+    await del.run(() => apiDelete<void>(`/adm/project-access/${encodeURIComponent(projectId)}`));
+    bump();
+  };
+
+  const cols: DataTableCol<ProjectAccess>[] = [
+    { key: "project", label: "Projeto", render: (r) => projectName(r.project_id), sort: (r) => projectName(r.project_id) },
+    { key: "emails", label: "E-mails diretos", render: (r) => (r.emails.length ? r.emails.join(", ") : "—") },
+    { key: "groups", label: "Grupos", render: (r) => (r.groups.length ? r.groups.join(", ") : "—") },
+    {
+      key: "actions",
+      label: "",
+      render: (r) => (
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+          <button type="button" onClick={() => setEditing(r.project_id)} style={{ ...btnGhostStyle, ...btnSmallStyle }}>
+            editar
+          </button>
+          <button type="button" onClick={() => remove(r.project_id)} style={{ ...btnGhostStyle, ...btnSmallStyle, color: "var(--bad)" }}>
+            excluir
+          </button>
+        </div>
+      ),
+    },
+  ];
+
+  const editingRow = editing ? access.data?.find((a) => a.project_id === editing) : undefined;
+
+  return (
+    <Panel
+      title="Acesso por projeto"
+      cap="Quem, fora do grupo ADM/FinOps, pode ver o custo de cada projeto -- por e-mail direto e/ou grupo do Workspace. Quem não estiver aqui (nem no bypass) vê a tela de 'sem projetos liberados'."
+    >
+      <LoadingOrError loading={access.loading && !access.data} error={access.error} />
+      {access.data && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {access.data.length > 0 && <DataTable cols={cols} rows={access.data} defaultPageSize={10} />}
+          <div>
+            {editing ? (
+              <>
+                <div style={{ fontSize: 12.5, color: "var(--muted-foreground)", marginBottom: 8 }}>
+                  Editando {projectName(editing)}
+                </div>
+                <ProjectAccessForm
+                  key={editing}
+                  projectId={editing}
+                  initial={editingRow}
+                  onSaved={() => {
+                    bump();
+                    setEditing(null);
+                  }}
+                />
+                <button type="button" onClick={() => setEditing(null)} style={{ ...btnGhostStyle, ...btnSmallStyle, marginTop: 10 }}>
+                  cancelar
+                </button>
+              </>
+            ) : (
+              <Field label="Adicionar acesso a um projeto">
+                <select
+                  value=""
+                  onChange={(e) => e.target.value && setEditing(e.target.value)}
+                  style={{ ...inputStyle, minWidth: 260 }}
+                >
+                  <option value="">Escolher projeto…</option>
+                  {newCandidates.map((p) => (
+                    <option key={p.project_id} value={p.project_id}>
+                      {p.project_name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            )}
+          </div>
+        </div>
+      )}
+    </Panel>
+  );
+}
+
 export function Adm() {
   const [reloadKey, setReloadKey] = useState(0);
   const budgets = useApi<BudgetConfig[]>("/adm/budgets", { _r: String(reloadKey) });
@@ -640,7 +793,7 @@ export function Adm() {
       <PageHeader
         eyebrow="Restrito"
         title="ADM"
-        desc="Cadastro de orçamento e e-mails responsáveis (grupo gcp-dp6-gti@dp6.com.br + matheus.fuzati@dp6.com.br) e relatório semanal de custo por e-mail."
+        desc="Cadastro de orçamento e e-mails responsáveis, acesso por projeto e relatório semanal de custo por e-mail. Grupo gcp-dp6-gti@dp6.com.br, grupo billing@dp6.com.br e matheus.fuzati@dp6.com.br veem o custo de todos os projetos sem precisar de cadastro."
       />
       <LoadingOrError loading={budgets.loading && !budgets.data} error={budgets.error} />
       {/* budgets.data (não "!loading && data") -- depois do 1º carregamento,
@@ -650,6 +803,7 @@ export function Adm() {
       {budgets.data && (
         <>
           <BudgetsPanel budgets={budgets.data} dims={dims.data} bump={bump} />
+          <ProjectAccessPanel dims={dims.data} />
           <WeeklyReportPanel budgets={budgets.data} bump={bump} />
         </>
       )}

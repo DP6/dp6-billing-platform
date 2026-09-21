@@ -80,7 +80,46 @@ def test_recommendations_sum():
 def test_me_not_admin_without_iap():
     r = client.get("/api/me")
     assert r.status_code == 200
-    assert r.json() == {"email": "", "is_admin": False}
+    assert r.json() == {"email": "", "is_admin": False, "unrestricted_projects": False}
+
+
+def test_me_projects_unrestricted_in_mock():
+    """Modo mock: get_authorized_project_ids sempre devolve None (dado de
+    demonstração, não dado real) -- ver project_access.py."""
+    r = client.get("/api/me/projects")
+    assert r.status_code == 200
+    assert r.json() == {"unrestricted": True, "projects": []}
+
+
+def test_project_access_forbidden_without_admin():
+    r = client.get("/api/adm/project-access")
+    assert r.status_code == 403
+
+
+def test_project_access_crud_with_dev_force_admin(monkeypatch):
+    """Modo mock: as rotas de CRUD respondem sem tocar o Firestore de verdade
+    (mesmo padrão de test_gcp_budgets_sync_flow_with_dev_force_admin)."""
+    from billing_api.config import get_settings
+
+    monkeypatch.setenv("BILLING_API_DEV_FORCE_ADMIN", "1")
+    get_settings.cache_clear()
+    try:
+        r = client.get("/api/adm/project-access")
+        assert r.status_code == 200
+        assert r.json() == []
+
+        r = client.put(
+            "/api/adm/project-access/dp6-ci-polaris",
+            json={"emails": ["fulano@dp6.com.br"], "groups": ["time-x@dp6.com.br"]},
+        )
+        assert r.status_code == 200
+        assert r.json()["project_id"] == "dp6-ci-polaris"
+        assert r.json()["emails"] == ["fulano@dp6.com.br"]
+
+        r = client.delete("/api/adm/project-access/dp6-ci-polaris")
+        assert r.status_code == 204
+    finally:
+        get_settings.cache_clear()
 
 
 def test_adm_budgets_forbidden_without_admin():
