@@ -1,6 +1,7 @@
 import { HBars, type HBarRow } from "../charts/HBars";
 import { PercentLines } from "../charts/PercentLines";
 import { Chip, DataTable, DrillBar, LoadingOrError, MetricGrid, MetricTile, PageHeader, Panel, StatusBadge } from "../components/ui";
+import { useAccess } from "../lib/access";
 import { useApi } from "../lib/api";
 import { brl, pctPlain, dayLabel } from "../lib/format";
 import { chartColor } from "../charts/palette";
@@ -79,6 +80,7 @@ function AllocSummary({ total, unallocated }: { total: number; unallocated: numb
 const statusTone = { ok: "ok", partial: "warn", missing: "error" } as const;
 
 export function Alocacao() {
+  const { unrestricted } = useAccess();
   const [f] = useFilters();
   const { drill, toggle, clear } = useDrillFilters(f);
   // scope/fp = filtros do topo (persistentes) + drill por clique (local da tela) --
@@ -112,58 +114,65 @@ export function Alocacao() {
       />
       <DrillBar entries={drillEntries} onRemove={(dim) => clear(dim as DrillDimension)} onClearAll={() => clear()} />
 
-      <Panel
-        title="Cobertura de label · por componente"
-        cap='% de RECURSOS distintos (não de custo) com cada label aplicado no export, nos últimos 30 dias — independe de quanto cada recurso custou ou rodou no período, só olha se o label está lá. Conta inteira. Só entram componentes onde isso é mensurável (Cloud Run, Secret Manager); BigQuery fica de fora — job de BigQuery é uma execução, não um recurso rotulável.'
-      >
-        <LoadingOrError loading={coverageByComponent.loading} error={coverageByComponent.error} />
-        {coverageByComponent.data && coverageByComponent.data.length > 0 && (
-          <DataTable
-            rows={coverageByComponent.data}
-            cols={[
-              {
-                key: "c",
-                label: "Componente",
-                render: (r: ComponentLabelCoverage) => <strong>{r.service_description}</strong>,
-                sort: (r) => r.service_description,
-              },
-              { key: "n", label: "Recursos", num: true, render: (r: ComponentLabelCoverage) => <span className="mono">{r.resources_total}</span>, sort: (r) => r.resources_total },
-              { key: "mb", label: "% managed-by", num: true, render: (r: ComponentLabelCoverage) => pctPlain(r.pct_managed_by), sort: (r) => r.pct_managed_by },
-              { key: "app", label: "% app", num: true, render: (r: ComponentLabelCoverage) => pctPlain(r.pct_app), sort: (r) => r.pct_app },
-              { key: "env", label: "% ambiente", num: true, render: (r: ComponentLabelCoverage) => pctPlain(r.pct_environment), sort: (r) => r.pct_environment },
-            ]}
-          />
-        )}
-      </Panel>
+      {/* rpt_label_coverage_by_component/rpt_unlabeled_resources não têm project_id --
+          ainda são sempre conta inteira (ver _require_unrestricted em routes.py), então
+          só quem tem bypass vê. */}
+      {unrestricted && (
+        <>
+          <Panel
+            title="Cobertura de label · por componente"
+            cap='% de RECURSOS distintos (não de custo) com cada label aplicado no export, nos últimos 30 dias — independe de quanto cada recurso custou ou rodou no período, só olha se o label está lá. Conta inteira. Só entram componentes onde isso é mensurável (Cloud Run, Secret Manager); BigQuery fica de fora — job de BigQuery é uma execução, não um recurso rotulável.'
+          >
+            <LoadingOrError loading={coverageByComponent.loading} error={coverageByComponent.error} />
+            {coverageByComponent.data && coverageByComponent.data.length > 0 && (
+              <DataTable
+                rows={coverageByComponent.data}
+                cols={[
+                  {
+                    key: "c",
+                    label: "Componente",
+                    render: (r: ComponentLabelCoverage) => <strong>{r.service_description}</strong>,
+                    sort: (r) => r.service_description,
+                  },
+                  { key: "n", label: "Recursos", num: true, render: (r: ComponentLabelCoverage) => <span className="mono">{r.resources_total}</span>, sort: (r) => r.resources_total },
+                  { key: "mb", label: "% managed-by", num: true, render: (r: ComponentLabelCoverage) => pctPlain(r.pct_managed_by), sort: (r) => r.pct_managed_by },
+                  { key: "app", label: "% app", num: true, render: (r: ComponentLabelCoverage) => pctPlain(r.pct_app), sort: (r) => r.pct_app },
+                  { key: "env", label: "% ambiente", num: true, render: (r: ComponentLabelCoverage) => pctPlain(r.pct_environment), sort: (r) => r.pct_environment },
+                ]}
+              />
+            )}
+          </Panel>
 
-      <Panel
-        title="Recursos sem label"
-        cap="Detalhamento acionável do painel acima — 1 linha por recurso com pelo menos 1 label faltando no export, ordenado por custo. Corrige-se na origem (Terraform/gcloud do recurso), não no billing."
-      >
-        <LoadingOrError loading={unlabeled.loading} error={unlabeled.error} />
-        {unlabeled.data && unlabeled.data.length > 0 && (
-          <DataTable
-            rows={unlabeled.data}
-            search={(r) => `${r.service_description} ${r.resource_name}`}
-            cols={[
-              { key: "svc", label: "Serviço", render: (r: UnlabeledResource) => r.service_description, sort: (r) => r.service_description },
-              { key: "res", label: "Recurso", render: (r: UnlabeledResource) => <span className="mono">{r.resource_name}</span>, sort: (r) => r.resource_name },
-              {
-                key: "miss",
-                label: "Faltando",
-                render: (r: UnlabeledResource) => (
-                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                    {r.missing_app && <Chip tone="bad">app</Chip>}
-                    {r.missing_environment && <Chip tone="bad">environment</Chip>}
-                    {r.missing_managed_by && <Chip tone="bad">managed-by</Chip>}
-                  </div>
-                ),
-              },
-              { key: "cost", label: "Custo (30d)", num: true, render: (r: UnlabeledResource) => <strong>{brl(r.net_cost_brl)}</strong>, sort: (r) => r.net_cost_brl },
-            ]}
-          />
-        )}
-      </Panel>
+          <Panel
+            title="Recursos sem label"
+            cap="Detalhamento acionável do painel acima — 1 linha por recurso com pelo menos 1 label faltando no export, ordenado por custo. Corrige-se na origem (Terraform/gcloud do recurso), não no billing."
+          >
+            <LoadingOrError loading={unlabeled.loading} error={unlabeled.error} />
+            {unlabeled.data && unlabeled.data.length > 0 && (
+              <DataTable
+                rows={unlabeled.data}
+                search={(r) => `${r.service_description} ${r.resource_name}`}
+                cols={[
+                  { key: "svc", label: "Serviço", render: (r: UnlabeledResource) => r.service_description, sort: (r) => r.service_description },
+                  { key: "res", label: "Recurso", render: (r: UnlabeledResource) => <span className="mono">{r.resource_name}</span>, sort: (r) => r.resource_name },
+                  {
+                    key: "miss",
+                    label: "Faltando",
+                    render: (r: UnlabeledResource) => (
+                      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                        {r.missing_app && <Chip tone="bad">app</Chip>}
+                        {r.missing_environment && <Chip tone="bad">environment</Chip>}
+                        {r.missing_managed_by && <Chip tone="bad">managed-by</Chip>}
+                      </div>
+                    ),
+                  },
+                  { key: "cost", label: "Custo (30d)", num: true, render: (r: UnlabeledResource) => <strong>{brl(r.net_cost_brl)}</strong>, sort: (r) => r.net_cost_brl },
+                ]}
+              />
+            )}
+          </Panel>
+        </>
+      )}
 
       <Panel title="Progressão da cobertura (por semana)" cap="Fração do custo líquido com cada chave preenchida.">
         <LoadingOrError loading={weekly.loading} error={weekly.error} />
@@ -184,30 +193,33 @@ export function Alocacao() {
         {byApp.data && <AllocSummary total={byApp.data.net_cost_total_brl} unallocated={byApp.data.unallocated_net_cost_brl} />}
       </Panel>
 
-      <Panel title="Prontidão de chargeback" cap="Critérios pra saber se dá pra usar o rateio como cobrança real, não só como referência interna.">
-        <LoadingOrError loading={chargeback.loading} error={chargeback.error} />
-        {chargeback.data && (
-          <>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-              <span className="mono" style={{ fontSize: 20, fontWeight: 700 }}>{pctPlain(chargeback.data.coverage_pct)}</span>
-              <StatusBadge tone={chargeback.data.ready ? "ok" : "error"}>{chargeback.data.ready ? "pronto" : "não pronto"}</StatusBadge>
-              <Chip tone="ok">calculado ao vivo</Chip>
-            </div>
-            <DataTable
-              rows={chargeback.data.criteria}
-              cols={[
-                { key: "l", label: "Critério", render: (c) => c.label },
-                { key: "s", label: "Status", render: (c) => <StatusBadge tone={statusTone[c.status as keyof typeof statusTone]}>{c.status}</StatusBadge> },
-                { key: "src", label: "", render: () => <Chip tone="warn">curado</Chip> },
-              ]}
-            />
-            <p style={{ margin: "8px 0 0", fontSize: 12, color: "var(--ink-dim)" }}>
-              Só o % e o badge acima são calculados a partir do dado real; os 3 critérios da
-              lista são um checklist mantido à mão, não recalculado automaticamente.
-            </p>
-          </>
-        )}
-      </Panel>
+      {/* rpt_label_coverage agregado (mês mais recente, conta inteira) -- ver _require_unrestricted. */}
+      {unrestricted && (
+        <Panel title="Prontidão de chargeback" cap="Critérios pra saber se dá pra usar o rateio como cobrança real, não só como referência interna.">
+          <LoadingOrError loading={chargeback.loading} error={chargeback.error} />
+          {chargeback.data && (
+            <>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                <span className="mono" style={{ fontSize: 20, fontWeight: 700 }}>{pctPlain(chargeback.data.coverage_pct)}</span>
+                <StatusBadge tone={chargeback.data.ready ? "ok" : "error"}>{chargeback.data.ready ? "pronto" : "não pronto"}</StatusBadge>
+                <Chip tone="ok">calculado ao vivo</Chip>
+              </div>
+              <DataTable
+                rows={chargeback.data.criteria}
+                cols={[
+                  { key: "l", label: "Critério", render: (c) => c.label },
+                  { key: "s", label: "Status", render: (c) => <StatusBadge tone={statusTone[c.status as keyof typeof statusTone]}>{c.status}</StatusBadge> },
+                  { key: "src", label: "", render: () => <Chip tone="warn">curado</Chip> },
+                ]}
+              />
+              <p style={{ margin: "8px 0 0", fontSize: 12, color: "var(--ink-dim)" }}>
+                Só o % e o badge acima são calculados a partir do dado real; os 3 critérios da
+                lista são um checklist mantido à mão, não recalculado automaticamente.
+              </p>
+            </>
+          )}
+        </Panel>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
         <Panel title="Custo alocado por app" cap={`Label nativo + reconciliado por recurso/job · ${janela}. Barras "(BigQuery · ...)" são custo de BigQuery sem label nativo, classificado pelo tipo de job — não é uma app de verdade, mas também não é anônimo.`}>

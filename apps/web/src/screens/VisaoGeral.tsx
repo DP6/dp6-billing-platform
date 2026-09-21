@@ -12,6 +12,7 @@ import {
   Panel,
   StatusBadge,
 } from "../components/ui";
+import { useAccess } from "../lib/access";
 import { useApi } from "../lib/api";
 import { brl, monthLabel, monthLong, pct, pctPlain, relativeToNow } from "../lib/format";
 import { DRILL_LABEL, type DrillDimension, useDrillFilters } from "../lib/useDrillFilters";
@@ -69,6 +70,7 @@ function AllocBars({
 }
 
 export function VisaoGeral() {
+  const { unrestricted } = useAccess();
   const [f] = useFilters();
   const { drill, toggle, clear } = useDrillFilters(f);
   const win = resolveWindow(f);
@@ -306,71 +308,75 @@ export function VisaoGeral() {
         </MetricGrid>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1.55fr 1fr", gap: 16 }}>
-        <Panel
-          title="Consumo acumulado vs. orçamento"
-          cap="Linha = realizado · tracejada = orçamento. Thresholds 50/80/100/120% no gráfico completo (PR B)."
-        >
-          <LoadingOrError loading={burndown.loading} error={burndown.error} />
-          {burndown.data && burndown.data.length > 0 && (
-            <AreaTrend
-              data={burndown.data.map((p) => ({
-                label: brDate(p.usage_date),
-                value: p.net_cost_cum_brl,
-                ma7: p.budget_brl ?? undefined, // sem orçamento cadastrado -> AreaTrend some com a linha tracejada
-              }))}
-            />
-          )}
-        </Panel>
+      {/* rpt_budget_daily/rpt_forecast_monthly não têm project_id -- ainda são sempre conta
+          inteira (ver _require_unrestricted em routes.py), então só quem tem bypass vê. */}
+      {unrestricted && (
+        <div style={{ display: "grid", gridTemplateColumns: "1.55fr 1fr", gap: 16 }}>
+          <Panel
+            title="Consumo acumulado vs. orçamento"
+            cap="Linha = realizado · tracejada = orçamento. Thresholds 50/80/100/120% no gráfico completo (PR B)."
+          >
+            <LoadingOrError loading={burndown.loading} error={burndown.error} />
+            {burndown.data && burndown.data.length > 0 && (
+              <AreaTrend
+                data={burndown.data.map((p) => ({
+                  label: brDate(p.usage_date),
+                  value: p.net_cost_cum_brl,
+                  ma7: p.budget_brl ?? undefined, // sem orçamento cadastrado -> AreaTrend some com a linha tracejada
+                }))}
+              />
+            )}
+          </Panel>
 
-        <Panel
-          title="Previsão — próximos 3 meses"
-          cap="Tendência estimada + faixa (histórico curto → incerteza alta)."
-        >
-          <LoadingOrError loading={forecast.loading} error={forecast.error} />
-          {forecast.data && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 6 }}>
-              {forecast.data.map((mo) => (
-                <div key={mo.invoice_month} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span
-                    className="mono"
-                    style={{ flex: "0 0 58px", fontSize: 12, color: "var(--muted-foreground)" }}
-                  >
-                    {monthLabel(mo.invoice_month)}
-                  </span>
-                  <span
-                    style={{
-                      flex: 1,
-                      height: 12,
-                      background: "var(--muted)",
-                      borderRadius: 3,
-                      overflow: "hidden",
-                    }}
-                  >
+          <Panel
+            title="Previsão — próximos 3 meses"
+            cap="Tendência estimada + faixa (histórico curto → incerteza alta)."
+          >
+            <LoadingOrError loading={forecast.loading} error={forecast.error} />
+            {forecast.data && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 6 }}>
+                {forecast.data.map((mo) => (
+                  <div key={mo.invoice_month} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span
+                      className="mono"
+                      style={{ flex: "0 0 58px", fontSize: 12, color: "var(--muted-foreground)" }}
+                    >
+                      {monthLabel(mo.invoice_month)}
+                    </span>
                     <span
                       style={{
-                        display: "block",
-                        height: "100%",
-                        width: `${Math.min((mo.value_brl / 24) * 100, 100)}%`,
-                        background: mo.is_actual ? "var(--chart-net)" : "var(--chart-other)",
+                        flex: 1,
+                        height: 12,
+                        background: "var(--muted)",
+                        borderRadius: 3,
+                        overflow: "hidden",
                       }}
-                    />
-                  </span>
-                  <span className="mono" style={{ flex: "0 0 130px", textAlign: "right", fontSize: 12 }}>
-                    {brl(mo.value_brl)}
-                    {mo.forecast_lo_brl != null && mo.forecast_hi_brl != null && (
-                      <span style={{ color: "var(--ink-mute)" }}>
-                        {" "}
-                        ({brl(mo.forecast_lo_brl)}–{brl(mo.forecast_hi_brl)})
-                      </span>
-                    )}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </Panel>
-      </div>
+                    >
+                      <span
+                        style={{
+                          display: "block",
+                          height: "100%",
+                          width: `${Math.min((mo.value_brl / 24) * 100, 100)}%`,
+                          background: mo.is_actual ? "var(--chart-net)" : "var(--chart-other)",
+                        }}
+                      />
+                    </span>
+                    <span className="mono" style={{ flex: "0 0 130px", textAlign: "right", fontSize: 12 }}>
+                      {brl(mo.value_brl)}
+                      {mo.forecast_lo_brl != null && mo.forecast_hi_brl != null && (
+                        <span style={{ color: "var(--ink-mute)" }}>
+                          {" "}
+                          ({brl(mo.forecast_lo_brl)}–{brl(mo.forecast_hi_brl)})
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Panel>
+        </div>
+      )}
 
       {/* widgets de janela */}
       <Panel

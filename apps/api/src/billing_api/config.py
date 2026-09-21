@@ -64,6 +64,13 @@ class Settings(BaseSettings):
     # (nao remover depois que a delegacao estiver funcionando).
     admin_bootstrap_emails: tuple[str, ...] = ("matheus.fuzati@dp6.com.br",)
 
+    # grupo FinOps -- ve custo de TODOS os projetos (bypass do ACL por
+    # projeto, project_access.py), igual admin_group_email, mas NAO ganha a
+    # aba ADM (isso continua exclusivo de admin_group_email/bootstrap). Ate
+    # a ampliacao do IAP pra domain:dp6.com.br, e o mesmo grupo que ja esta
+    # no allowlist do IAP (terraform/environments/{dev,prod}/variables.tf).
+    finops_group_email: str = "billing@dp6.com.br"
+
     # remetente do relatorio semanal (Gmail API, domain-wide delegation,
     # escopo gmail.send -- so a SA de runtime de PROD tem esse escopo).
     report_sender_email: str = "admin.victoria@dp6.com.br"
