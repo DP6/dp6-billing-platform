@@ -210,6 +210,14 @@ export interface MeProjects {
   unrestricted: boolean;
   projects: Project[];
 }
+export interface Admins {
+  emails: string[];
+  // e-mails sempre admin via config do backend (break-glass, não editável
+  // nesta lista) -- só pra exibição, não hardcodar no front.
+  bootstrap_emails: string[];
+  updated_at: string | null;
+  updated_by: string | null;
+}
 export interface ProjectAccess {
   project_id: string;
   emails: string[];

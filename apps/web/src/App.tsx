@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { NavLink, Route, Routes, useSearchParams } from "react-router-dom";
+import { Link, NavLink, Route, Routes, useLocation, useSearchParams } from "react-router-dom";
 import { useApi } from "./lib/api";
 import { relativeToNow } from "./lib/format";
 import {
@@ -33,13 +33,19 @@ const BASE_TABS: Tab[] = [
   ["/anomalias", "Anomalias", Anomalias],
 ];
 
-// aba ADM (cadastro de budget + relatório semanal) só aparece pra quem passa
-// no require_admin do backend (grupo gcp-dp6-gti@dp6.com.br + bootstrap) --
-// /me é chamado 2x de propósito (aqui e em Screens()), mesmo padrão que
-// FilterBar/VisaoGeral já usam pra /dimensions, sem levantar state.
-function useTabs(): Tab[] {
+// ADM não é mais uma aba na lista (App.tsx, PR "ícone de ADM no TopBar") --
+// vira um ícone fixo no canto superior direito, só pra quem passa no
+// require_admin do backend (e-mail bootstrap + lista autogerenciável em
+// firestore.get_admins_or_empty, ver auth.py). A rota /adm continua
+// registrada em Screens() incondicionalmente: quem não é admin só não vê o
+// ícone (a garantia de verdade é o backend, que 403 em qualquer /adm/*
+// mesmo se alguém digitar a URL na mão -- mesmo espírito do MeDTO.is_admin,
+// "UI convenience only"). /me é chamado 2x de propósito (aqui e em
+// Screens()), mesmo padrão que FilterBar/VisaoGeral já usam pra /dimensions,
+// sem levantar state.
+function useIsAdmin(): boolean {
   const me = useApi<Me>("/me");
-  return me.data?.is_admin ? [...BASE_TABS, ["/adm", "ADM", Adm]] : BASE_TABS;
+  return me.data?.is_admin ?? false;
 }
 
 const eyebrow = {
@@ -56,6 +62,44 @@ const selectStyle = {
   borderRadius: "var(--radius)",
   minWidth: 130,
 };
+
+function AdmIcon() {
+  const isAdmin = useIsAdmin();
+  const location = useLocation();
+  if (!isAdmin) return null;
+  const active = location.pathname === "/adm";
+  return (
+    <Link
+      to="/adm"
+      aria-label="Administração"
+      title="Administração"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: 34,
+        height: 34,
+        background: active ? "rgba(255,179,2,0.16)" : "transparent",
+        border: `1px solid ${active ? "#ffb302" : "#4a4a44"}`,
+        borderRadius: "var(--radius)",
+        color: active ? "#ffb302" : "#f2f1ec",
+      }}
+    >
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        aria-hidden="true"
+      >
+        <path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z" />
+        <path d="M9.5 12l1.8 1.8L15 10" />
+      </svg>
+    </Link>
+  );
+}
 
 function TopBar() {
   const { theme, toggle } = useTheme();
@@ -98,6 +142,7 @@ function TopBar() {
           dados {relativeToNow(meta.data.data_updated_at)}
         </span>
       )}
+      <AdmIcon />
       <button
         type="button"
         onClick={toggle}
@@ -277,7 +322,7 @@ function FilterBar() {
 }
 
 export default function App() {
-  const tabs = useTabs();
+  const tabs = BASE_TABS;
   // sp aqui só serve pra repassar a querystring atual nos links de aba (abaixo) --
   // NavLink a="/rota" descarta location.search por padrão, o que derrubava
   // service/environment/app/project/from/to a cada troca de tela.
@@ -336,7 +381,7 @@ export default function App() {
  *  React poderia pular a atualização da tela). */
 function Screens() {
   useSearchParams();
-  const tabs = useTabs();
+  const tabs = BASE_TABS;
   return (
     <main
       style={{
@@ -352,6 +397,11 @@ function Screens() {
         {tabs.map(([to, , Comp]) => (
           <Route key={to} path={to} element={<Comp />} />
         ))}
+        {/* fora do tabs.map de propósito -- não aparece na barra de abas (é o
+            ícone do TopBar, ver AdmIcon), mas a rota existe pra todo mundo;
+            quem não é admin só recebe 403 de cada /adm/* (require_admin no
+            backend é a garantia de verdade, não esconder a rota). */}
+        <Route path="/adm" element={<Adm />} />
       </Routes>
     </main>
   );

@@ -35,6 +35,7 @@ ACCOUNT_SCOPE = "_account"
 _BUDGETS = "budgets"
 _ADM_CONFIG = "adm_config"
 _WEEKLY_REPORT_DOC = "weekly_report"
+_ADMINS_DOC = "admins"
 _PROJECT_ACCESS = "project_access"
 
 
@@ -213,6 +214,36 @@ def record_report_run(status: str) -> None:
         doc.set({"last_run_at": _now(), "last_run_status": status}, merge=True)
     except Exception:
         log.warning("Falha ao gravar last_run_at/status do relatório semanal", exc_info=True)
+
+
+# ---------------------------------------------------------------- administradores da aba ADM
+
+def get_admins() -> list[str]:
+    """Fail-loud (ver docstring do módulo) -- usado só pela própria aba ADM
+    (só quem já é admin consegue ver/editar esta lista)."""
+    snap = _get_client().collection(_ADM_CONFIG).document(_ADMINS_DOC).get()
+    if not snap.exists:
+        return []
+    return list(snap.to_dict().get("emails") or [])
+
+
+def get_admins_or_empty() -> list[str]:
+    """Fail-CLOSED -- oposto do fail-open de get_budget_or_none: erro aqui
+    nunca deve ampliar quem é admin. Usada só por auth.is_admin_email, nunca
+    pela aba ADM (essa segue fail-loud via get_admins + _fs_or_503)."""
+    try:
+        return get_admins()
+    except Exception:
+        log.warning("Firestore indisponível lendo admins — 0 administradores extras", exc_info=True)
+        return []
+
+
+def set_admins(emails: list[str], actor_email: str) -> list[str]:
+    clean = sorted({e.strip().lower() for e in emails if e.strip()})
+    _get_client().collection(_ADM_CONFIG).document(_ADMINS_DOC).set(
+        {"emails": clean, "updated_at": _now(), "updated_by": actor_email}
+    )
+    return clean
 
 
 # ---------------------------------------------------------------- acesso por projeto (ADM)
