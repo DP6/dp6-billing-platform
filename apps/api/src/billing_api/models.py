@@ -265,6 +265,22 @@ class MeDTO(BaseModel):
     unrestricted_projects: bool = False
 
 
+class AdminsDTO(BaseModel):
+    """Administradores da aba ADM. `emails` é a lista autogerenciável
+    (Firestore, editável aqui); `bootstrap_emails` são os e-mails SEMPRE
+    admin via config (Settings.admin_bootstrap_emails) -- break-glass
+    permanente, não editável nesta tela, só espelhado pro front não
+    hardcodar o valor."""
+    emails: list[str]
+    bootstrap_emails: list[str] = []
+    updated_at: str | None = None
+    updated_by: str | None = None
+
+
+class AdminsUpdateDTO(BaseModel):
+    emails: list[str]
+
+
 class ProjectAccessDTO(BaseModel):
     """1 linha de project_access/{project_id} no Firestore -- quem pode ver
     o custo desse projeto (e-mail direto e/ou grupo do Workspace), fora dos
