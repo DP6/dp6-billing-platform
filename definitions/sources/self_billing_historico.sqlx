@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: "dp6-ci-polaris",
+  schema: "billing_platform_stg_prod",
+  name: "raw_self_billing_historico",
+  description: "Custo histórico jan-jun/2026 (lacuna anterior ao billing_export real), carregado uma única vez via scripts/backfill_self_billing_historico.py a partir dos 6 CSVs 'DP6 Self Billing (Voucher)_Cost' exportados manualmente do console de faturamento. Schema fixo em billing_platform_stg_prod (não usa staging_dataset + schema_suffix) porque é uma carga manual única, igual em qualquer ambiente que compile este repo — não faz parte do ciclo incremental normal. Ver docs/adr/ADR-010-backfill-historico-self-billing-csv.md."
+}

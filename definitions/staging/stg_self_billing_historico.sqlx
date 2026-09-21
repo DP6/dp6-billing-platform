@@ -1,0 +1,32 @@
+config {
+  type: "table",
+  schema: dataform.projectConfig.vars.staging_dataset,
+  tags: ["billing_platform"],
+  description: "Custo histórico jan-jun/2026 (self_billing_historico), projetado no mesmo formato de colunas que stg_billing_platform usa pra alimentar fct_billing_cost_daily. Tabela fechada (type: table, não incremental) — o período histórico não muda depois de carregado. Sem label_*/label_*_reconciled (não existiam labels pré-Dataform) e sem credits_total_brl próprio (o CSV representa crédito/desconto como linha separada de custo negativo no mesmo grão da linha de uso, não como array aninhado — a soma no fato já líquida os dois). gross_cost_usd/net_cost_usd usam a taxa de câmbio única do mês (cabeçalho do CSV), não a taxa diária. Ver docs/adr/ADR-010-backfill-historico-self-billing-csv.md."
+}
+
+SELECT
+  invoice_month,
+  PARSE_DATE('%Y%m', invoice_month)                    AS invoice_month_date,
+  usage_date,
+  project_id,
+  project_name,
+  service_description,
+  sku_description,
+  pricing_unit,
+  CAST(NULL AS STRING)                                  AS location_location,
+  cost_type,
+  CAST(NULL AS STRING)                                  AS label_environment,
+  CAST(NULL AS STRING)                                  AS label_app,
+  CAST(NULL AS STRING)                                  AS label_managed_by,
+  CAST(NULL AS STRING)                                  AS label_environment_reconciled,
+  CAST(NULL AS STRING)                                  AS label_app_reconciled,
+
+  gross_cost_brl,
+  CAST(0.0 AS FLOAT64)                                  AS credits_total_brl,
+  gross_cost_brl                                        AS net_cost_brl,
+  CAST(NULL AS FLOAT64)                                 AS cost_at_list_brl,
+  SAFE_DIVIDE(gross_cost_brl, fx_rate_brl_per_usd)       AS gross_cost_usd,
+  SAFE_DIVIDE(gross_cost_brl, fx_rate_brl_per_usd)       AS net_cost_usd,
+  usage_amount_pricing_units
+FROM ${ref("self_billing_historico")}
