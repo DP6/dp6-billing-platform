@@ -2,7 +2,7 @@ config {
   type: "incremental",
   schema: dataform.projectConfig.vars.mart_dataset,
   tags: ["billing_platform"],
-  description: "Fato diario de custo. Grao: invoice_month x usage_date x project x service x sku x pricing_unit x location x cost_type x label_environment x label_app x label_managed_by x label_environment_reconciled x label_app_reconciled. `project_id`/`project_name` adicionados em relacao ao polaris-cost-model (que so cobria 1 projeto) — ver docs/adr/.",
+  description: "Fato diario de custo. Grao: invoice_month x usage_date x project x service x sku x pricing_unit x location x cost_type x label_environment x label_app x label_managed_by x label_environment_reconciled x label_app_reconciled. `project_id`/`project_name` adicionados em relacao ao polaris-cost-model (que so cobria 1 projeto) — ver docs/adr/. Fonte e UNION de stg_billing_platform (billing_export ao vivo) com stg_self_billing_historico (backfill jan-jun/2026, ver ADR-010) — as particoes historicas ficam fora do updatePartitionFilter de 45 dias, entao so sao (re)escritas num --full-refresh.",
   // uniqueKey aponta pro grain_key sintetico (ver SELECT), nao pras colunas de grao cruas.
   // Motivo: sem uniqueKey, updatePartitionFilter nao substitui a particao -- cada run
   // incremental duplicava as SUMs do grao dentro do lookback (incidente 2026-09-11, herdado
@@ -54,7 +54,23 @@ SELECT
   SUM(usage_amount_pricing_units)    AS usage_amount_pricing_units,
   COUNT(*)                           AS line_count
 
-FROM ${ref("stg_billing_platform")}
+FROM (
+  SELECT
+    invoice_month, invoice_month_date, usage_date, project_id, project_name, service_description,
+    sku_description, pricing_unit, location_location, cost_type, label_environment, label_app,
+    label_managed_by, label_environment_reconciled, label_app_reconciled,
+    gross_cost_brl, credits_total_brl, net_cost_brl, cost_at_list_brl, gross_cost_usd, net_cost_usd,
+    usage_amount_pricing_units
+  FROM ${ref("stg_billing_platform")}
+  UNION ALL
+  SELECT
+    invoice_month, invoice_month_date, usage_date, project_id, project_name, service_description,
+    sku_description, pricing_unit, location_location, cost_type, label_environment, label_app,
+    label_managed_by, label_environment_reconciled, label_app_reconciled,
+    gross_cost_brl, credits_total_brl, net_cost_brl, cost_at_list_brl, gross_cost_usd, net_cost_usd,
+    usage_amount_pricing_units
+  FROM ${ref("stg_self_billing_historico")}
+)
 ${when(incremental(), `WHERE ${c.lookbackFilter("usage_date")}`)}
 GROUP BY
   invoice_month, invoice_month_date, usage_date, project_id, service_description, sku_description,
