@@ -29,4 +29,4 @@ SELECT
   SAFE_DIVIDE(gross_cost_brl, fx_rate_brl_per_usd)       AS gross_cost_usd,
   SAFE_DIVIDE(gross_cost_brl, fx_rate_brl_per_usd)       AS net_cost_usd,
   usage_amount_pricing_units
-FROM ${ref("self_billing_historico")}
+FROM ${ref("raw_self_billing_historico")}
