@@ -194,6 +194,19 @@ def delete_budget(scope: str) -> None:
     _get_client().collection(_BUDGETS).document(scope).delete()
 
 
+def list_budgets_or_empty() -> list[dict[str, Any]]:
+    """Fail-CLOSED -- usada só pelo caminho de autorização (project_access.py)
+    pra herdar automaticamente, como acesso de projeto, quem já está cadastrado
+    como e-mail responsável do orçamento (mesmo espírito de
+    list_project_access_or_empty: erro aqui nunca deve ampliar o que o caller
+    vê). Nunca usada pela aba ADM -- essa segue fail-loud via list_budgets."""
+    try:
+        return list_budgets()
+    except Exception:
+        log.warning("Firestore indisponível lendo budgets — 0 acessos derivados de orçamento", exc_info=True)
+        return []
+
+
 # ---------------------------------------------------------------- relatorio semanal
 
 def get_weekly_report_config() -> dict[str, Any]:

@@ -2,7 +2,15 @@ import { type CSSProperties, useEffect, useRef, useState } from "react";
 import { DataTable, type DataTableCol, LoadingOrError, PageHeader, Panel } from "../components/ui";
 import { apiDelete, apiPost, apiPut, useApi, useMutationState } from "../lib/api";
 import { brl } from "../lib/format";
-import type { Admins, BudgetConfig, Dimensions, ProjectAccess, SendNowResult, SyncBudgetsResult, WeeklyReportConfig } from "../types";
+import type {
+  Admins,
+  BudgetConfig,
+  Dimensions,
+  ProjectAccess,
+  SendNowResult,
+  SyncBudgetsResult,
+  WeeklyReportConfig,
+} from "../types";
 
 const ACCOUNT_SCOPE = "_account";
 
@@ -11,7 +19,9 @@ const ACCOUNT_SCOPE = "_account";
  *  fsdb.delete_budget). Usado nos dois painéis (Orçamentos e Relatório
  *  semanal), que mostram a mesma lista por ângulos diferentes. */
 function confirmDeleteAll(count: number): boolean {
-  if (!confirm(`Excluir TODOS os ${count} orçamentos de projeto cadastrados? Essa ação não pode ser desfeita.`)) {
+  if (
+    !confirm(`Excluir TODOS os ${count} orçamentos de projeto cadastrados? Essa ação não pode ser desfeita.`)
+  ) {
     return false;
   }
   return confirm(
@@ -75,7 +85,10 @@ function AdminsPanel() {
   }, [admins.data]);
 
   const save = async () => {
-    const list = emails.split(",").map((e) => e.trim()).filter(Boolean);
+    const list = emails
+      .split(",")
+      .map((e) => e.trim())
+      .filter(Boolean);
     await run(() => apiPut<Admins>("/adm/admins", { emails: list }));
   };
 
@@ -237,7 +250,10 @@ function BudgetForm({
   }, [initial]);
 
   const save = async () => {
-    const list = emails.split(",").map((e) => e.trim()).filter(Boolean);
+    const list = emails
+      .split(",")
+      .map((e) => e.trim())
+      .filter(Boolean);
     await run(() =>
       apiPut<BudgetConfig>(`/adm/budgets/${encodeURIComponent(scope)}`, {
         budget_brl: Number(budgetBrl.replace(",", ".")) || 0,
@@ -267,7 +283,9 @@ function BudgetForm({
           style={{ ...inputStyle, width: 140 }}
         />
         {budgetSynced && (
-          <span style={syncBadgeStyle}>sincronizado do GCP — uma sincronização futura pode sobrescrever esse valor</span>
+          <span style={syncBadgeStyle}>
+            sincronizado do GCP — uma sincronização futura pode sobrescrever esse valor
+          </span>
         )}
       </Field>
       <Field label="E-mails responsáveis (grupo e/ou avulso, separados por vírgula)">
@@ -280,11 +298,15 @@ function BudgetForm({
         />
         {emailsSynced ? (
           <span style={syncBadgeStyle}>
-            sincronizado do GCP — sincronização futura só ACRESCENTA e-mail novo do GCP, nunca remove o que está aqui
+            sincronizado do GCP — sincronização futura só ACRESCENTA e-mail novo do GCP, nunca remove o que
+            está aqui
           </span>
         ) : (
-          initial && initial.gcp_emails.length > 0 && (
-            <span style={syncBadgeStyle}>toggle desligado — e-mails do GCP não são mais adicionados automaticamente</span>
+          initial &&
+          initial.gcp_emails.length > 0 && (
+            <span style={syncBadgeStyle}>
+              toggle desligado — e-mails do GCP não são mais adicionados automaticamente
+            </span>
           )
         )}
         {initial && initial.emails.length > 0 && (
@@ -301,7 +323,15 @@ function BudgetForm({
   );
 }
 
-function BudgetsPanel({ budgets, dims, bump }: { budgets: BudgetConfig[]; dims: Dimensions | undefined; bump: () => void }) {
+function BudgetsPanel({
+  budgets,
+  dims,
+  bump,
+}: {
+  budgets: BudgetConfig[];
+  dims: Dimensions | undefined;
+  bump: () => void;
+}) {
   const account = budgets.find((b) => b.scope === ACCOUNT_SCOPE);
   const projectBudgets = budgets.filter((b) => b.scope !== ACCOUNT_SCOPE);
   const configuredIds = new Set(projectBudgets.map((b) => b.scope));
@@ -326,7 +356,9 @@ function BudgetsPanel({ budgets, dims, bump }: { budgets: BudgetConfig[]; dims: 
   const removeAll = async () => {
     if (!confirmDeleteAll(projectBudgets.length)) return;
     await delAll.run(async () => {
-      await Promise.all(projectBudgets.map((b) => apiDelete<void>(`/adm/budgets/${encodeURIComponent(b.scope)}`)));
+      await Promise.all(
+        projectBudgets.map((b) => apiDelete<void>(`/adm/budgets/${encodeURIComponent(b.scope)}`)),
+      );
     });
     bump();
   };
@@ -346,12 +378,14 @@ function BudgetsPanel({ budgets, dims, bump }: { budgets: BudgetConfig[]; dims: 
   const setAllBudgetSync = async (value: boolean) => {
     await bulkSyncFlags.run(async () => {
       await Promise.all(
-        projectBudgets.filter((b) => b.budget_source_gcp !== value).map((b) =>
-          apiPut<BudgetConfig>(`/adm/budgets/${encodeURIComponent(b.scope)}/sync-flags`, {
-            budget_source_gcp: value,
-            emails_source_gcp: b.emails_source_gcp,
-          }),
-        ),
+        projectBudgets
+          .filter((b) => b.budget_source_gcp !== value)
+          .map((b) =>
+            apiPut<BudgetConfig>(`/adm/budgets/${encodeURIComponent(b.scope)}/sync-flags`, {
+              budget_source_gcp: value,
+              emails_source_gcp: b.emails_source_gcp,
+            }),
+          ),
       );
     });
     bump();
@@ -359,12 +393,14 @@ function BudgetsPanel({ budgets, dims, bump }: { budgets: BudgetConfig[]; dims: 
   const setAllEmailsSync = async (value: boolean) => {
     await bulkSyncFlags.run(async () => {
       await Promise.all(
-        projectBudgets.filter((b) => b.emails_source_gcp !== value).map((b) =>
-          apiPut<BudgetConfig>(`/adm/budgets/${encodeURIComponent(b.scope)}/sync-flags`, {
-            budget_source_gcp: b.budget_source_gcp,
-            emails_source_gcp: value,
-          }),
-        ),
+        projectBudgets
+          .filter((b) => b.emails_source_gcp !== value)
+          .map((b) =>
+            apiPut<BudgetConfig>(`/adm/budgets/${encodeURIComponent(b.scope)}/sync-flags`, {
+              budget_source_gcp: b.budget_source_gcp,
+              emails_source_gcp: value,
+            }),
+          ),
       );
     });
     bump();
@@ -373,19 +409,42 @@ function BudgetsPanel({ budgets, dims, bump }: { budgets: BudgetConfig[]; dims: 
   const allEmailsSynced = projectBudgets.length > 0 && projectBudgets.every((b) => b.emails_source_gcp);
 
   const cols: DataTableCol<BudgetConfig>[] = [
-    { key: "project", label: "Projeto", render: (r) => r.project_name ?? r.scope, sort: (r) => r.project_name ?? r.scope },
-    { key: "budget", label: "Orçamento", num: true, render: (r) => brl(r.budget_brl), sort: (r) => r.budget_brl },
-    { key: "emails", label: "E-mails", render: (r) => <EmailBadgeList emails={r.emails} gcpEmails={r.gcp_emails} /> },
+    {
+      key: "project",
+      label: "Projeto",
+      render: (r) => r.project_name ?? r.scope,
+      sort: (r) => r.project_name ?? r.scope,
+    },
+    {
+      key: "budget",
+      label: "Orçamento",
+      num: true,
+      render: (r) => brl(r.budget_brl),
+      sort: (r) => r.budget_brl,
+    },
+    {
+      key: "emails",
+      label: "E-mails",
+      render: (r) => <EmailBadgeList emails={r.emails} gcpEmails={r.gcp_emails} />,
+    },
     { key: "sync", label: "Sincronizar do GCP", render: (r) => <SyncToggles cfg={r} bump={bump} /> },
     {
       key: "actions",
       label: "",
       render: (r) => (
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-          <button type="button" onClick={() => setEditing(r.scope)} style={{ ...btnGhostStyle, ...btnSmallStyle }}>
+          <button
+            type="button"
+            onClick={() => setEditing(r.scope)}
+            style={{ ...btnGhostStyle, ...btnSmallStyle }}
+          >
             editar
           </button>
-          <button type="button" onClick={() => remove(r.scope)} style={{ ...btnGhostStyle, ...btnSmallStyle, color: "var(--bad)" }}>
+          <button
+            type="button"
+            onClick={() => remove(r.scope)}
+            style={{ ...btnGhostStyle, ...btnSmallStyle, color: "var(--bad)" }}
+          >
             excluir
           </button>
         </div>
@@ -403,7 +462,12 @@ function BudgetsPanel({ budgets, dims, bump }: { budgets: BudgetConfig[]; dims: 
       cap="Budget e e-mails responsáveis, por projeto e para a conta inteira. Projeto com budget cadastrado no GCP entra aqui automaticamente na 1ª sincronização — os 2 toggles por linha controlam se orçamento/e-mails continuam vindo do GCP ou passam a ser manuais."
       actions={
         <div style={{ display: "flex", gap: 8 }}>
-          <button type="button" onClick={syncNow} disabled={sync.loading} style={{ ...btnGhostStyle, ...btnSmallStyle }}>
+          <button
+            type="button"
+            onClick={syncNow}
+            disabled={sync.loading}
+            style={{ ...btnGhostStyle, ...btnSmallStyle }}
+          >
             {sync.loading ? "Sincronizando…" : "Sincronizar orçamentos do GCP agora"}
           </button>
           {projectBudgets.length > 0 && (
@@ -426,16 +490,25 @@ function BudgetsPanel({ budgets, dims, bump }: { budgets: BudgetConfig[]; dims: 
           <span style={{ fontSize: 12, color: "var(--muted-foreground)" }}>
             {syncResult.scopes_created.length > 0 && `criados: ${syncResult.scopes_created.join(", ")}. `}
             {syncResult.scopes_updated.length > 0 && `atualizados: ${syncResult.scopes_updated.join(", ")}. `}
-            {syncResult.scopes_skipped.length > 0 && `pulados (toggle desligado): ${syncResult.scopes_skipped.join(", ")}. `}
+            {syncResult.scopes_skipped.length > 0 &&
+              `pulados (toggle desligado): ${syncResult.scopes_skipped.join(", ")}. `}
             {syncResult.scopes_failed.length > 0 && `falharam: ${syncResult.scopes_failed.join(", ")}. `}
-            {syncResult.scopes_created.length + syncResult.scopes_updated.length + syncResult.scopes_skipped.length + syncResult.scopes_failed.length === 0 &&
-              "nenhum budget encontrado no GCP."}
+            {syncResult.scopes_created.length +
+              syncResult.scopes_updated.length +
+              syncResult.scopes_skipped.length +
+              syncResult.scopes_failed.length ===
+              0 && "nenhum budget encontrado no GCP."}
           </span>
         )}
         <div>
           <span style={{ ...fieldLabel, display: "block", marginBottom: 8 }}>Conta inteira</span>
           <div style={{ display: "flex", alignItems: "flex-end", gap: 20, flexWrap: "wrap" }}>
-            <BudgetForm key={`account-${account?.updated_at ?? ""}`} scope={ACCOUNT_SCOPE} initial={account} onSaved={bump} />
+            <BudgetForm
+              key={`account-${account?.updated_at ?? ""}`}
+              scope={ACCOUNT_SCOPE}
+              initial={account}
+              onSaved={bump}
+            />
             {account && <SyncToggles cfg={account} bump={bump} />}
           </div>
         </div>
@@ -443,7 +516,9 @@ function BudgetsPanel({ budgets, dims, bump }: { budgets: BudgetConfig[]; dims: 
         <div style={{ paddingTop: 16, borderTop: "1px solid var(--border)" }}>
           <span style={{ ...fieldLabel, display: "block", marginBottom: 8 }}>Por projeto</span>
           {projectBudgets.length > 0 && (
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
+            <div
+              style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 10 }}
+            >
               <span style={{ fontSize: 12, color: "var(--muted-foreground)" }}>Orçamento do GCP:</span>
               <button
                 type="button"
@@ -461,7 +536,9 @@ function BudgetsPanel({ budgets, dims, bump }: { budgets: BudgetConfig[]; dims: 
               >
                 desmarcar todos
               </button>
-              <span style={{ fontSize: 12, color: "var(--muted-foreground)", marginLeft: 12 }}>E-mails do GCP:</span>
+              <span style={{ fontSize: 12, color: "var(--muted-foreground)", marginLeft: 12 }}>
+                E-mails do GCP:
+              </span>
               <button
                 type="button"
                 onClick={() => setAllEmailsSync(true)}
@@ -482,7 +559,10 @@ function BudgetsPanel({ budgets, dims, bump }: { budgets: BudgetConfig[]; dims: 
           )}
           {projectBudgets.length > 0 && <DataTable cols={cols} rows={projectBudgets} defaultPageSize={10} />}
 
-          <div ref={editFormRef} style={{ marginTop: projectBudgets.length > 0 ? 16 : 0, scrollMarginTop: 20 }}>
+          <div
+            ref={editFormRef}
+            style={{ marginTop: projectBudgets.length > 0 ? 16 : 0, scrollMarginTop: 20 }}
+          >
             {editing ? (
               <>
                 <div style={{ fontSize: 12.5, color: "var(--muted-foreground)", marginBottom: 8 }}>
@@ -498,7 +578,11 @@ function BudgetsPanel({ budgets, dims, bump }: { budgets: BudgetConfig[]; dims: 
                     setEditing(null);
                   }}
                 />
-                <button type="button" onClick={() => setEditing(null)} style={{ ...btnGhostStyle, ...btnSmallStyle, marginTop: 10 }}>
+                <button
+                  type="button"
+                  onClick={() => setEditing(null)}
+                  style={{ ...btnGhostStyle, ...btnSmallStyle, marginTop: 10 }}
+                >
                   cancelar
                 </button>
               </>
@@ -539,7 +623,15 @@ function EmailPreview({ scope, html }: { scope: string; html: string }) {
         overflow: "hidden",
       }}
     >
-      <div style={{ padding: "8px 16px", background: "#f0efec", borderBottom: "1px solid #dedcda", fontSize: 11.5, color: "#555b62" }}>
+      <div
+        style={{
+          padding: "8px 16px",
+          background: "#f0efec",
+          borderBottom: "1px solid #dedcda",
+          fontSize: 11.5,
+          color: "#555b62",
+        }}
+      >
         prévia · {scope === ACCOUNT_SCOPE ? "Conta inteira" : scope}
       </div>
       <div style={{ padding: 16 }} dangerouslySetInnerHTML={{ __html: html }} />
@@ -562,16 +654,20 @@ function WeeklyReportPanel({ budgets, bump }: { budgets: BudgetConfig[]; bump: (
   const rows = budgets;
 
   const setEnabled = async (scope: string, enabled: boolean) => {
-    await toggle.run(() => apiPut<BudgetConfig>(`/adm/budgets/${encodeURIComponent(scope)}/report-enabled`, { enabled }));
+    await toggle.run(() =>
+      apiPut<BudgetConfig>(`/adm/budgets/${encodeURIComponent(scope)}/report-enabled`, { enabled }),
+    );
     bump();
   };
 
   const setAll = async (enabled: boolean) => {
     await bulkToggle.run(async () => {
       await Promise.all(
-        rows.filter((r) => r.report_enabled !== enabled).map((r) =>
-          apiPut<BudgetConfig>(`/adm/budgets/${encodeURIComponent(r.scope)}/report-enabled`, { enabled }),
-        ),
+        rows
+          .filter((r) => r.report_enabled !== enabled)
+          .map((r) =>
+            apiPut<BudgetConfig>(`/adm/budgets/${encodeURIComponent(r.scope)}/report-enabled`, { enabled }),
+          ),
       );
     });
     bump();
@@ -583,7 +679,9 @@ function WeeklyReportPanel({ budgets, bump }: { budgets: BudgetConfig[]; bump: (
   const removeAll = async () => {
     if (!confirmDeleteAll(deletableRows.length)) return;
     await delAll.run(async () => {
-      await Promise.all(deletableRows.map((r) => apiDelete<void>(`/adm/budgets/${encodeURIComponent(r.scope)}`)));
+      await Promise.all(
+        deletableRows.map((r) => apiDelete<void>(`/adm/budgets/${encodeURIComponent(r.scope)}`)),
+      );
     });
     bump();
   };
@@ -591,7 +689,9 @@ function WeeklyReportPanel({ budgets, bump }: { budgets: BudgetConfig[]; bump: (
   const sendNow = async (scope?: string) => {
     setSendingScope(scope ?? "*");
     try {
-      const r = await send.run(() => apiPost<SendNowResult>("/adm/weekly-report/send-now", scope ? { scope } : undefined));
+      const r = await send.run(() =>
+        apiPost<SendNowResult>("/adm/weekly-report/send-now", scope ? { scope } : undefined),
+      );
       setResult(r);
     } finally {
       setSendingScope(null);
@@ -602,7 +702,11 @@ function WeeklyReportPanel({ budgets, bump }: { budgets: BudgetConfig[]; bump: (
 
   const cols: DataTableCol<BudgetConfig>[] = [
     { key: "scope", label: "Escopo", render: (r) => scopeLabel(r), sort: (r) => scopeLabel(r) },
-    { key: "emails", label: "E-mails", render: (r) => <EmailBadgeList emails={r.emails} gcpEmails={r.gcp_emails} /> },
+    {
+      key: "emails",
+      label: "E-mails",
+      render: (r) => <EmailBadgeList emails={r.emails} gcpEmails={r.gcp_emails} />,
+    },
     {
       key: "enabled",
       label: "Ativado",
@@ -647,10 +751,20 @@ function WeeklyReportPanel({ budgets, bump }: { budgets: BudgetConfig[]; bump: (
           ) : (
             <>
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                <button type="button" onClick={() => setAll(true)} disabled={bulkToggle.loading || allEnabled} style={{ ...btnGhostStyle, ...btnSmallStyle }}>
+                <button
+                  type="button"
+                  onClick={() => setAll(true)}
+                  disabled={bulkToggle.loading || allEnabled}
+                  style={{ ...btnGhostStyle, ...btnSmallStyle }}
+                >
                   marcar todos
                 </button>
-                <button type="button" onClick={() => setAll(false)} disabled={bulkToggle.loading} style={{ ...btnGhostStyle, ...btnSmallStyle }}>
+                <button
+                  type="button"
+                  onClick={() => setAll(false)}
+                  disabled={bulkToggle.loading}
+                  style={{ ...btnGhostStyle, ...btnSmallStyle }}
+                >
                   desmarcar todos
                 </button>
                 {deletableRows.length > 0 && (
@@ -725,8 +839,14 @@ function ProjectAccessForm({
   const save = async () => {
     await run(() =>
       apiPut<ProjectAccess>(`/adm/project-access/${encodeURIComponent(projectId)}`, {
-        emails: emails.split(",").map((e) => e.trim()).filter(Boolean),
-        groups: groups.split(",").map((g) => g.trim()).filter(Boolean),
+        emails: emails
+          .split(",")
+          .map((e) => e.trim())
+          .filter(Boolean),
+        groups: groups
+          .split(",")
+          .map((g) => g.trim())
+          .filter(Boolean),
       }),
     );
     onSaved();
@@ -734,6 +854,31 @@ function ProjectAccessForm({
 
   return (
     <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: "10px 16px" }}>
+      {initial && initial.budget_emails.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <span style={fieldLabel}>Via orçamento (automático)</span>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", maxWidth: 280 }}>
+            {initial.budget_emails.map((e) => (
+              <span
+                key={e}
+                className="mono"
+                style={{
+                  fontSize: 11.5,
+                  padding: "3px 8px",
+                  borderRadius: 999,
+                  background: "var(--muted)",
+                  border: "1px solid var(--border-strong)",
+                }}
+              >
+                {e}
+              </span>
+            ))}
+          </div>
+          <span style={{ fontSize: 10.5, color: "var(--muted-foreground)" }}>
+            edite o orçamento (aba acima) pra mudar -- aqui só se acrescenta gente
+          </span>
+        </div>
+      )}
       <Field label="E-mails diretos (separados por vírgula)">
         <input
           type="text"
@@ -760,94 +905,610 @@ function ProjectAccessForm({
   );
 }
 
-/** Quem pode ver o custo de cada projeto (aba ADM) -- e-mail direto e/ou grupo do
- *  Workspace, checado via project_access.py no backend. Grupo ADM (gcp-dp6-gti@),
- *  grupo FinOps (billing@) e o e-mail bootstrap NÃO precisam estar aqui -- eles têm
- *  bypass total (ver PageHeader.desc). */
-function ProjectAccessPanel({ dims }: { dims: Dimensions | undefined }) {
-  const [reloadKey, setReloadKey] = useState(0);
-  const bump = () => setReloadKey((k) => k + 1);
-  const access = useApi<ProjectAccess[]>("/adm/project-access", { _r: String(reloadKey) });
+/** "Por projeto" -- a visão original: 1 linha por projeto, e-mails/grupos
+ *  adicionados manualmente ao lado do que já veio automático do orçamento
+ *  (budget_emails, só leitura -- edita-se via aba Orçamentos). Excluir só
+ *  aparece quando há algo manual pra remover (projeto só-orçamento não tem
+ *  doc nenhum ainda, DELETE nele seria um no-op). */
+function ByProjectView({
+  rows,
+  dims,
+  bump,
+}: {
+  rows: ProjectAccess[];
+  dims: Dimensions | undefined;
+  bump: () => void;
+}) {
   const [editing, setEditing] = useState<string | null>(null);
-
-  const configuredIds = new Set((access.data ?? []).map((a) => a.project_id));
+  const configuredIds = new Set(rows.map((a) => a.project_id));
   const newCandidates = (dims?.projects ?? []).filter((p) => !configuredIds.has(p.project_id));
   const projectName = (id: string) => dims?.projects.find((p) => p.project_id === id)?.project_name ?? id;
 
   const del = useMutationState<void>();
   const remove = async (projectId: string) => {
-    if (!confirm(`Remover o acesso cadastrado para ${projectName(projectId)}? Ninguém sem bypass verá mais este projeto.`)) return;
+    if (
+      !confirm(
+        `Remover o acesso manual cadastrado para ${projectName(projectId)}? Quem tem acesso via orçamento continua vendo o projeto.`,
+      )
+    ) {
+      return;
+    }
     await del.run(() => apiDelete<void>(`/adm/project-access/${encodeURIComponent(projectId)}`));
     bump();
   };
 
   const cols: DataTableCol<ProjectAccess>[] = [
-    { key: "project", label: "Projeto", render: (r) => projectName(r.project_id), sort: (r) => projectName(r.project_id) },
-    { key: "emails", label: "E-mails diretos", render: (r) => (r.emails.length ? r.emails.join(", ") : "—") },
-    { key: "groups", label: "Grupos", render: (r) => (r.groups.length ? r.groups.join(", ") : "—") },
+    {
+      key: "project",
+      label: "Projeto",
+      render: (r) => projectName(r.project_id),
+      sort: (r) => projectName(r.project_id),
+    },
+    {
+      key: "budget_emails",
+      label: "Via orçamento (auto)",
+      render: (r) => (r.budget_emails.length ? r.budget_emails.join(", ") : "—"),
+    },
+    {
+      key: "emails",
+      label: "E-mails adicionados",
+      render: (r) => (r.emails.length ? r.emails.join(", ") : "—"),
+    },
+    {
+      key: "groups",
+      label: "Grupos adicionados",
+      render: (r) => (r.groups.length ? r.groups.join(", ") : "—"),
+    },
     {
       key: "actions",
       label: "",
       render: (r) => (
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-          <button type="button" onClick={() => setEditing(r.project_id)} style={{ ...btnGhostStyle, ...btnSmallStyle }}>
+          <button
+            type="button"
+            onClick={() => setEditing(r.project_id)}
+            style={{ ...btnGhostStyle, ...btnSmallStyle }}
+          >
             editar
           </button>
-          <button type="button" onClick={() => remove(r.project_id)} style={{ ...btnGhostStyle, ...btnSmallStyle, color: "var(--bad)" }}>
-            excluir
-          </button>
+          {(r.emails.length > 0 || r.groups.length > 0) && (
+            <button
+              type="button"
+              onClick={() => remove(r.project_id)}
+              style={{ ...btnGhostStyle, ...btnSmallStyle, color: "var(--bad)" }}
+            >
+              excluir
+            </button>
+          )}
         </div>
       ),
     },
   ];
 
-  const editingRow = editing ? access.data?.find((a) => a.project_id === editing) : undefined;
+  const editingRow = editing ? rows.find((a) => a.project_id === editing) : undefined;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {rows.length > 0 && <DataTable cols={cols} rows={rows} defaultPageSize={10} />}
+      <div>
+        {editing ? (
+          <>
+            <div style={{ fontSize: 12.5, color: "var(--muted-foreground)", marginBottom: 8 }}>
+              Editando {projectName(editing)}
+            </div>
+            <ProjectAccessForm
+              key={editing}
+              projectId={editing}
+              initial={editingRow}
+              onSaved={() => {
+                bump();
+                setEditing(null);
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setEditing(null)}
+              style={{ ...btnGhostStyle, ...btnSmallStyle, marginTop: 10 }}
+            >
+              cancelar
+            </button>
+          </>
+        ) : (
+          <Field label="Adicionar acesso a um projeto">
+            <select
+              value=""
+              onChange={(e) => e.target.value && setEditing(e.target.value)}
+              style={{ ...inputStyle, minWidth: 260 }}
+            >
+              <option value="">Escolher projeto…</option>
+              {newCandidates.map((p) => (
+                <option key={p.project_id} value={p.project_id}>
+                  {p.project_name}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Lista de checkboxes de projeto, reaproveitada pelos editores "por pessoa"
+ *  e "por grupo" -- `locked` trava (e explica) os projetos herdados do
+ *  orçamento, que não dá pra desmarcar por aqui. */
+function ProjectCheckboxList({
+  projects,
+  checked,
+  locked,
+  onToggle,
+}: {
+  projects: { project_id: string; project_name: string }[];
+  checked: Set<string>;
+  locked: Set<string>;
+  onToggle: (projectId: string) => void;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 4,
+        maxHeight: 260,
+        overflowY: "auto",
+        border: "1px solid var(--border)",
+        borderRadius: "var(--radius)",
+        padding: 10,
+      }}
+    >
+      {projects.length === 0 && (
+        <span style={{ fontSize: 12.5, color: "var(--muted-foreground)" }}>Nenhum projeto disponível.</span>
+      )}
+      {projects.map((p) => (
+        <label
+          key={p.project_id}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            fontSize: 13,
+            opacity: locked.has(p.project_id) ? 0.65 : 1,
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={checked.has(p.project_id)}
+            disabled={locked.has(p.project_id)}
+            onChange={() => onToggle(p.project_id)}
+          />
+          {p.project_name}
+          {locked.has(p.project_id) && (
+            <span style={{ fontSize: 10.5, color: "var(--muted-foreground)" }}>(via orçamento)</span>
+          )}
+        </label>
+      ))}
+    </div>
+  );
+}
+
+/** Pivô de `rows` (linhas por projeto) pra "por pessoa" -- pra cada e-mail,
+ *  quais projetos vêm do cadastro manual (project_access.emails) e quais vêm
+ *  automático do orçamento (budget_emails, só leitura). */
+function buildPersonIndex(rows: ProjectAccess[]): Map<string, { manual: Set<string>; budget: Set<string> }> {
+  const idx = new Map<string, { manual: Set<string>; budget: Set<string> }>();
+  const get = (email: string) => {
+    let entry = idx.get(email);
+    if (!entry) {
+      entry = { manual: new Set(), budget: new Set() };
+      idx.set(email, entry);
+    }
+    return entry;
+  };
+  for (const r of rows) {
+    for (const e of r.emails) get(e).manual.add(r.project_id);
+    for (const e of r.budget_emails) get(e).budget.add(r.project_id);
+  }
+  return idx;
+}
+
+function buildGroupIndex(rows: ProjectAccess[]): Map<string, Set<string>> {
+  const idx = new Map<string, Set<string>>();
+  for (const r of rows) {
+    for (const g of r.groups) {
+      if (!idx.has(g)) idx.set(g, new Set());
+      idx.get(g)?.add(r.project_id);
+    }
+  }
+  return idx;
+}
+
+/** Editor "por pessoa": marca/desmarca projetos pra 1 e-mail -- só toca no
+ *  campo manual `emails` de cada project_access afetado (nunca mexe em
+ *  `groups`), então convive de boa com o que já veio via grupo ou orçamento.
+ *  Projetos herdados do orçamento aparecem travados/marcados (ver `locked`). */
+function PersonAccessEditor({
+  email,
+  rows,
+  dims,
+  onSaved,
+}: {
+  email: string;
+  rows: ProjectAccess[];
+  dims: Dimensions | undefined;
+  onSaved: () => void;
+}) {
+  const rowByProject = new Map(rows.map((r) => [r.project_id, r]));
+  const budgetLocked = new Set(rows.filter((r) => r.budget_emails.includes(email)).map((r) => r.project_id));
+  const initialManual = new Set(rows.filter((r) => r.emails.includes(email)).map((r) => r.project_id));
+  const [selected, setSelected] = useState<Set<string>>(new Set([...initialManual, ...budgetLocked]));
+  const { loading, error, run } = useMutationState<void>();
+
+  const toggle = (projectId: string) => {
+    if (budgetLocked.has(projectId)) return;
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(projectId)) next.delete(projectId);
+      else next.add(projectId);
+      return next;
+    });
+  };
+
+  const save = async () => {
+    const wanted = new Set([...selected].filter((id) => !budgetLocked.has(id)));
+    const touched = new Set([...initialManual, ...wanted]);
+    await run(async () => {
+      await Promise.all(
+        [...touched].map((projectId) => {
+          const row = rowByProject.get(projectId);
+          const currentEmails = row?.emails ?? [];
+          const has = currentEmails.includes(email);
+          const shouldHave = wanted.has(projectId);
+          if (has === shouldHave) return Promise.resolve();
+          const nextEmails = shouldHave
+            ? [...currentEmails, email]
+            : currentEmails.filter((e) => e !== email);
+          return apiPut<ProjectAccess>(`/adm/project-access/${encodeURIComponent(projectId)}`, {
+            emails: nextEmails,
+            groups: row?.groups ?? [],
+          });
+        }),
+      );
+    });
+    onSaved();
+  };
+
+  const projects = (dims?.projects ?? []).map((p) => ({
+    project_id: p.project_id,
+    project_name: p.project_name,
+  }));
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <ProjectCheckboxList projects={projects} checked={selected} locked={budgetLocked} onToggle={toggle} />
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <button type="button" onClick={save} disabled={loading} style={btnStyle}>
+          {loading ? "Salvando…" : "Salvar"}
+        </button>
+        {error && <span style={{ color: "var(--bad)", fontSize: 12.5 }}>{error}</span>}
+      </div>
+    </div>
+  );
+}
+
+/** "Por pessoa" -- 2ª via de cadastro (complementa o que já veio do
+ *  orçamento): escolhe um e-mail já conhecido, ou digita um novo, e marca em
+ *  quais projetos ele tem acesso. */
+function ByPersonPanel({
+  rows,
+  dims,
+  bump,
+}: {
+  rows: ProjectAccess[];
+  dims: Dimensions | undefined;
+  bump: () => void;
+}) {
+  const index = buildPersonIndex(rows);
+  const people = [...index.keys()].sort();
+  const [selectedEmail, setSelectedEmail] = useState<string | null>(null);
+  const [newEmail, setNewEmail] = useState("");
+
+  const addNew = () => {
+    const email = newEmail.trim().toLowerCase();
+    if (!email?.includes("@")) return;
+    setSelectedEmail(email);
+    setNewEmail("");
+  };
+
+  return (
+    <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+      <div style={{ minWidth: 240 }}>
+        <span style={{ ...fieldLabel, display: "block", marginBottom: 8 }}>
+          Pessoas com acesso cadastrado
+        </span>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2, maxHeight: 280, overflowY: "auto" }}>
+          {people.length === 0 && (
+            <span style={{ fontSize: 12.5, color: "var(--muted-foreground)" }}>Nenhuma ainda.</span>
+          )}
+          {people.map((email) => {
+            const entry = index.get(email);
+            const total = entry ? new Set([...entry.manual, ...entry.budget]).size : 0;
+            return (
+              <button
+                key={email}
+                type="button"
+                onClick={() => setSelectedEmail(email)}
+                style={{
+                  textAlign: "left",
+                  padding: "6px 8px",
+                  borderRadius: "var(--radius)",
+                  border: "1px solid transparent",
+                  background: selectedEmail === email ? "var(--muted)" : "transparent",
+                  cursor: "pointer",
+                  fontSize: 12.5,
+                }}
+              >
+                {email}
+                <span style={{ color: "var(--muted-foreground)", marginLeft: 6, fontSize: 11 }}>
+                  {total} projeto{total === 1 ? "" : "s"}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+          <input
+            type="text"
+            value={newEmail}
+            onChange={(e) => setNewEmail(e.target.value)}
+            placeholder="novo-email@dp6.com.br"
+            style={{ ...inputStyle, flex: 1, minWidth: 0 }}
+            onKeyDown={(e) => e.key === "Enter" && addNew()}
+          />
+          <button type="button" onClick={addNew} style={{ ...btnGhostStyle, ...btnSmallStyle }}>
+            + pessoa
+          </button>
+        </div>
+      </div>
+      <div style={{ flex: 1, minWidth: 260 }}>
+        {selectedEmail ? (
+          <>
+            <span style={{ ...fieldLabel, display: "block", marginBottom: 8 }}>
+              Projetos de {selectedEmail}
+            </span>
+            <PersonAccessEditor
+              key={selectedEmail}
+              email={selectedEmail}
+              rows={rows}
+              dims={dims}
+              onSaved={bump}
+            />
+          </>
+        ) : (
+          <span style={{ fontSize: 12.5, color: "var(--muted-foreground)" }}>
+            Escolha uma pessoa à esquerda, ou cadastre uma nova.
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Editor "por grupo": mesmo padrão do PersonAccessEditor, mas mexendo em
+ *  `groups` -- sem trava de orçamento (budgets não distingue grupo de
+ *  pessoa, então não dá pra saber com certeza que um endereço lá é grupo). */
+function GroupAccessEditor({
+  group,
+  rows,
+  dims,
+  onSaved,
+}: {
+  group: string;
+  rows: ProjectAccess[];
+  dims: Dimensions | undefined;
+  onSaved: () => void;
+}) {
+  const rowByProject = new Map(rows.map((r) => [r.project_id, r]));
+  const initial = new Set(rows.filter((r) => r.groups.includes(group)).map((r) => r.project_id));
+  const [selected, setSelected] = useState<Set<string>>(new Set(initial));
+  const { loading, error, run } = useMutationState<void>();
+
+  const toggle = (projectId: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(projectId)) next.delete(projectId);
+      else next.add(projectId);
+      return next;
+    });
+  };
+
+  const save = async () => {
+    const touched = new Set([...initial, ...selected]);
+    await run(async () => {
+      await Promise.all(
+        [...touched].map((projectId) => {
+          const row = rowByProject.get(projectId);
+          const currentGroups = row?.groups ?? [];
+          const has = currentGroups.includes(group);
+          const shouldHave = selected.has(projectId);
+          if (has === shouldHave) return Promise.resolve();
+          const nextGroups = shouldHave
+            ? [...currentGroups, group]
+            : currentGroups.filter((g) => g !== group);
+          return apiPut<ProjectAccess>(`/adm/project-access/${encodeURIComponent(projectId)}`, {
+            emails: row?.emails ?? [],
+            groups: nextGroups,
+          });
+        }),
+      );
+    });
+    onSaved();
+  };
+
+  const projects = (dims?.projects ?? []).map((p) => ({
+    project_id: p.project_id,
+    project_name: p.project_name,
+  }));
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <ProjectCheckboxList projects={projects} checked={selected} locked={new Set()} onToggle={toggle} />
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <button type="button" onClick={save} disabled={loading} style={btnStyle}>
+          {loading ? "Salvando…" : "Salvar"}
+        </button>
+        {error && <span style={{ color: "var(--bad)", fontSize: 12.5 }}>{error}</span>}
+      </div>
+    </div>
+  );
+}
+
+/** "Por grupo" -- 3ª via de cadastro, mesmo espírito de "Por pessoa" mas
+ *  pivotando em grupo do Workspace. */
+function ByGroupPanel({
+  rows,
+  dims,
+  bump,
+}: {
+  rows: ProjectAccess[];
+  dims: Dimensions | undefined;
+  bump: () => void;
+}) {
+  const index = buildGroupIndex(rows);
+  const groups = [...index.keys()].sort();
+  const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
+  const [newGroup, setNewGroup] = useState("");
+
+  const addNew = () => {
+    const group = newGroup.trim().toLowerCase();
+    if (!group?.includes("@")) return;
+    setSelectedGroup(group);
+    setNewGroup("");
+  };
+
+  return (
+    <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+      <div style={{ minWidth: 240 }}>
+        <span style={{ ...fieldLabel, display: "block", marginBottom: 8 }}>Grupos com acesso cadastrado</span>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2, maxHeight: 280, overflowY: "auto" }}>
+          {groups.length === 0 && (
+            <span style={{ fontSize: 12.5, color: "var(--muted-foreground)" }}>Nenhum ainda.</span>
+          )}
+          {groups.map((group) => {
+            const count = index.get(group)?.size ?? 0;
+            return (
+              <button
+                key={group}
+                type="button"
+                onClick={() => setSelectedGroup(group)}
+                style={{
+                  textAlign: "left",
+                  padding: "6px 8px",
+                  borderRadius: "var(--radius)",
+                  border: "1px solid transparent",
+                  background: selectedGroup === group ? "var(--muted)" : "transparent",
+                  cursor: "pointer",
+                  fontSize: 12.5,
+                }}
+              >
+                {group}
+                <span style={{ color: "var(--muted-foreground)", marginLeft: 6, fontSize: 11 }}>
+                  {count} projeto{count === 1 ? "" : "s"}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+          <input
+            type="text"
+            value={newGroup}
+            onChange={(e) => setNewGroup(e.target.value)}
+            placeholder="time-x@dp6.com.br"
+            style={{ ...inputStyle, flex: 1, minWidth: 0 }}
+            onKeyDown={(e) => e.key === "Enter" && addNew()}
+          />
+          <button type="button" onClick={addNew} style={{ ...btnGhostStyle, ...btnSmallStyle }}>
+            + grupo
+          </button>
+        </div>
+      </div>
+      <div style={{ flex: 1, minWidth: 260 }}>
+        {selectedGroup ? (
+          <>
+            <span style={{ ...fieldLabel, display: "block", marginBottom: 8 }}>
+              Projetos de {selectedGroup}
+            </span>
+            <GroupAccessEditor
+              key={selectedGroup}
+              group={selectedGroup}
+              rows={rows}
+              dims={dims}
+              onSaved={bump}
+            />
+          </>
+        ) : (
+          <span style={{ fontSize: 12.5, color: "var(--muted-foreground)" }}>
+            Escolha um grupo à esquerda, ou cadastre um novo.
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+type AccessTab = "project" | "person" | "group";
+const ACCESS_TABS: [AccessTab, string][] = [
+  ["project", "Por projeto"],
+  ["person", "Por pessoa"],
+  ["group", "Por grupo"],
+];
+
+/** Quem pode ver o custo de cada projeto (aba ADM) -- e-mail direto e/ou grupo do
+ *  Workspace, checado via project_access.py no backend. Grupo ADM (gcp-dp6-gti@),
+ *  grupo FinOps (billing@) e o e-mail bootstrap NÃO precisam estar aqui -- eles têm
+ *  bypass total (ver PageHeader.desc). 3 vias de cadastro, mesma fonte de dados:
+ *  por projeto (view original), por pessoa e por grupo (pivôs de conveniência) --
+ *  as 2 últimas só ACRESCENTAM em cima do que já veio automático do orçamento. */
+function ProjectAccessPanel({ dims }: { dims: Dimensions | undefined }) {
+  const [reloadKey, setReloadKey] = useState(0);
+  const bump = () => setReloadKey((k) => k + 1);
+  const access = useApi<ProjectAccess[]>("/adm/project-access", { _r: String(reloadKey) });
+  const [tab, setTab] = useState<AccessTab>("project");
+  const rows = access.data ?? [];
 
   return (
     <Panel
       title="Acesso por projeto"
-      cap="Quem, fora do grupo ADM/FinOps, pode ver o custo de cada projeto -- por e-mail direto e/ou grupo do Workspace. Quem não estiver aqui (nem no bypass) vê a tela de 'sem projetos liberados'."
+      cap="Quem, fora do grupo ADM/FinOps, pode ver o custo de cada projeto. Quem já está cadastrado como e-mail responsável do orçamento (aba Orçamentos) ganha acesso automaticamente -- aqui só se ACRESCENTA gente, nunca se remove quem vem do orçamento (edite o orçamento pra isso). Quem não estiver liberado (nem no bypass) vê a tela de 'sem projetos liberados'."
     >
       <LoadingOrError loading={access.loading && !access.data} error={access.error} />
       {access.data && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {access.data.length > 0 && <DataTable cols={cols} rows={access.data} defaultPageSize={10} />}
-          <div>
-            {editing ? (
-              <>
-                <div style={{ fontSize: 12.5, color: "var(--muted-foreground)", marginBottom: 8 }}>
-                  Editando {projectName(editing)}
-                </div>
-                <ProjectAccessForm
-                  key={editing}
-                  projectId={editing}
-                  initial={editingRow}
-                  onSaved={() => {
-                    bump();
-                    setEditing(null);
-                  }}
-                />
-                <button type="button" onClick={() => setEditing(null)} style={{ ...btnGhostStyle, ...btnSmallStyle, marginTop: 10 }}>
-                  cancelar
-                </button>
-              </>
-            ) : (
-              <Field label="Adicionar acesso a um projeto">
-                <select
-                  value=""
-                  onChange={(e) => e.target.value && setEditing(e.target.value)}
-                  style={{ ...inputStyle, minWidth: 260 }}
-                >
-                  <option value="">Escolher projeto…</option>
-                  {newCandidates.map((p) => (
-                    <option key={p.project_id} value={p.project_id}>
-                      {p.project_name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-            )}
+          <div
+            style={{ display: "flex", gap: 6, borderBottom: "1px solid var(--border)", paddingBottom: 10 }}
+          >
+            {ACCESS_TABS.map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setTab(key)}
+                style={{
+                  ...btnGhostStyle,
+                  ...btnSmallStyle,
+                  border: "none",
+                  borderBottom: tab === key ? "2px solid var(--primary)" : "2px solid transparent",
+                  borderRadius: 0,
+                  color: tab === key ? "var(--foreground)" : "var(--muted-foreground)",
+                  fontWeight: tab === key ? 600 : 500,
+                }}
+              >
+                {label}
+              </button>
+            ))}
           </div>
+          {tab === "project" && <ByProjectView rows={rows} dims={dims} bump={bump} />}
+          {tab === "person" && <ByPersonPanel rows={rows} dims={dims} bump={bump} />}
+          {tab === "group" && <ByGroupPanel rows={rows} dims={dims} bump={bump} />}
         </div>
       )}
     </Panel>

@@ -85,9 +85,23 @@ def upsert_admins(body: m.AdminsUpdateDTO, actor: str = Depends(require_admin)) 
 
 @router.get("/adm/project-access", response_model=list[m.ProjectAccessDTO])
 def list_project_access(_: str = Depends(require_admin)) -> list[m.ProjectAccessDTO]:
+    """1 linha por projeto que tenha QUALQUER acesso cadastrado -- manual
+    (project_access) e/ou herdado do orçamento (budgets.emails, ver
+    project_access._compute_authorized_project_ids). Projeto só com orçamento
+    (sem project_access ainda) já aparece aqui, com emails/groups vazios e
+    budget_emails preenchido -- editar/salvar (PUT) cria o doc manual."""
     if mock_active():
         return []
-    return [m.ProjectAccessDTO(**row) for row in _fs_or_503(fsdb.list_project_access)]
+    manual = {row["project_id"]: row for row in _fs_or_503(fsdb.list_project_access)}
+    budget_emails_by_project = {
+        b["scope"]: b.get("emails", []) for b in _fs_or_503(fsdb.list_budgets) if b["scope"] != fsdb.ACCOUNT_SCOPE
+    }
+    project_ids = set(manual) | set(budget_emails_by_project)
+    out = []
+    for pid in sorted(project_ids):
+        row = manual.get(pid) or {"project_id": pid, "emails": [], "groups": [], "updated_at": None, "updated_by": None}
+        out.append(m.ProjectAccessDTO(**row, budget_emails=budget_emails_by_project.get(pid, [])))
+    return out
 
 
 @router.put("/adm/project-access/{project_id}", response_model=m.ProjectAccessDTO)

@@ -116,6 +116,7 @@ def test_compute_authorized_project_ids_direct_email(monkeypatch):
         "list_project_access_or_empty",
         lambda: [{"project_id": "proj-a", "emails": ["fulano@dp6.com.br"], "groups": []}],
     )
+    monkeypatch.setattr(fsdb, "list_budgets_or_empty", lambda: [])
     monkeypatch.setattr(workspace_directory, "is_group_member", lambda *_: False)
     assert pa._compute_authorized_project_ids("fulano@dp6.com.br") == frozenset({"proj-a"})
     assert pa._compute_authorized_project_ids("outra@dp6.com.br") == frozenset()
@@ -134,6 +135,7 @@ def test_compute_authorized_project_ids_via_group_dedup(monkeypatch):
             {"project_id": "proj-c", "emails": [], "groups": ["outro@dp6.com.br"]},
         ],
     )
+    monkeypatch.setattr(fsdb, "list_budgets_or_empty", lambda: [])
     calls = []
 
     def fake_is_group_member(group, email):
@@ -145,6 +147,84 @@ def test_compute_authorized_project_ids_via_group_dedup(monkeypatch):
     assert result == frozenset({"proj-a", "proj-b"})
     assert calls.count("time-x@dp6.com.br") == 1
     assert calls.count("outro@dp6.com.br") == 1
+
+
+def test_compute_authorized_project_ids_via_budget_direct_email(monkeypatch):
+    """Quem está cadastrado como e-mail responsável do orçamento de 1 projeto
+    (aba Orçamentos) ganha acesso automático àquele projeto -- é o cadastro de
+    nível mais alto, project_access só ACRESCENTA em cima disso."""
+    monkeypatch.setattr(pa, "is_bypass_principal", lambda _: False)
+    monkeypatch.setattr(fsdb, "list_project_access_or_empty", lambda: [])
+    monkeypatch.setattr(
+        fsdb,
+        "list_budgets_or_empty",
+        lambda: [{"scope": "proj-a", "emails": ["fulano@dp6.com.br"]}],
+    )
+    monkeypatch.setattr(workspace_directory, "is_group_member", lambda *_: False)
+    assert pa._compute_authorized_project_ids("fulano@dp6.com.br") == frozenset({"proj-a"})
+    assert pa._compute_authorized_project_ids("outra@dp6.com.br") == frozenset()
+
+
+def test_compute_authorized_project_ids_ignores_account_wide_budget(monkeypatch):
+    """O orçamento da conta inteira (_account) não mapeia pra 1 projeto só --
+    quem só está no e-mail responsável dele não ganha acesso a nenhum projeto
+    por causa disso (bypass de conta inteira continua sendo só is_bypass_principal)."""
+    monkeypatch.setattr(pa, "is_bypass_principal", lambda _: False)
+    monkeypatch.setattr(fsdb, "list_project_access_or_empty", lambda: [])
+    monkeypatch.setattr(
+        fsdb,
+        "list_budgets_or_empty",
+        lambda: [{"scope": fsdb.ACCOUNT_SCOPE, "emails": ["fulano@dp6.com.br"]}],
+    )
+    monkeypatch.setattr(workspace_directory, "is_group_member", lambda *_: False)
+    assert pa._compute_authorized_project_ids("fulano@dp6.com.br") == frozenset()
+
+
+def test_compute_authorized_project_ids_via_budget_group_membership(monkeypatch):
+    """budgets.emails não distingue pessoa de grupo -- um endereço que é na
+    verdade um grupo do Workspace também dá acesso por membership (mesmo
+    caminho de is_group_member usado por project_access.groups)."""
+    monkeypatch.setattr(pa, "is_bypass_principal", lambda _: False)
+    monkeypatch.setattr(fsdb, "list_project_access_or_empty", lambda: [])
+    monkeypatch.setattr(
+        fsdb,
+        "list_budgets_or_empty",
+        lambda: [{"scope": "proj-a", "emails": ["time-x@dp6.com.br"]}],
+    )
+    monkeypatch.setattr(workspace_directory, "is_group_member", lambda g, _: g == "time-x@dp6.com.br")
+    assert pa._compute_authorized_project_ids("membro@dp6.com.br") == frozenset({"proj-a"})
+
+
+# ---------------------------------------------------------------- adm_routes.list_project_access (merge orçamento + manual)
+
+def test_adm_list_project_access_merges_budget_and_manual(monkeypatch):
+    from billing_api import adm_routes
+
+    monkeypatch.setattr(adm_routes, "mock_active", lambda: False)
+    monkeypatch.setattr(
+        fsdb,
+        "list_project_access",
+        lambda: [
+            {"project_id": "proj-a", "emails": ["manual@dp6.com.br"], "groups": [], "updated_at": None, "updated_by": None}
+        ],
+    )
+    monkeypatch.setattr(
+        fsdb,
+        "list_budgets",
+        lambda: [
+            {"scope": "proj-a", "emails": ["orcamento-a@dp6.com.br"]},
+            {"scope": "proj-b", "emails": ["orcamento-b@dp6.com.br"]},
+            {"scope": fsdb.ACCOUNT_SCOPE, "emails": ["conta@dp6.com.br"]},
+        ],
+    )
+    rows = {r.project_id: r for r in adm_routes.list_project_access(_="admin@dp6.com.br")}
+    assert set(rows) == {"proj-a", "proj-b"}  # orçamento da conta inteira nunca vira 1 linha de projeto
+    assert rows["proj-a"].emails == ["manual@dp6.com.br"]
+    assert rows["proj-a"].budget_emails == ["orcamento-a@dp6.com.br"]
+    # proj-b só tem orçamento, nenhum cadastro manual ainda -- aparece mesmo assim.
+    assert rows["proj-b"].emails == []
+    assert rows["proj-b"].groups == []
+    assert rows["proj-b"].budget_emails == ["orcamento-b@dp6.com.br"]
 
 
 def test_get_authorized_project_ids_mock_mode_is_unrestricted():
