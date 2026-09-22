@@ -282,12 +282,17 @@ class AdminsUpdateDTO(BaseModel):
 
 
 class ProjectAccessDTO(BaseModel):
-    """1 linha de project_access/{project_id} no Firestore -- quem pode ver
-    o custo desse projeto (e-mail direto e/ou grupo do Workspace), fora dos
-    3 principals com bypass total (ver project_access.is_bypass_principal)."""
+    """1 linha de acesso a projeto -- combina o cadastro MANUAL de
+    project_access/{project_id} (emails/groups, editável pela aba ADM) com o
+    cadastro AUTOMÁTICO herdado do orçamento (budget_emails, só leitura aqui --
+    edita-se via /adm/budgets). Quem pode ver o custo desse projeto é a união
+    dos três, fora dos 3 principals com bypass total (ver
+    project_access.is_bypass_principal). Um projeto só com orçamento (sem
+    project_access ainda) também aparece, com emails/groups vazios."""
     project_id: str
     emails: list[str] = []
     groups: list[str] = []
+    budget_emails: list[str] = []
     updated_at: str | None = None
     updated_by: str | None = None
 
