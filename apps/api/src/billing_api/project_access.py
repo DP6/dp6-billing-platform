@@ -9,9 +9,15 @@ docstring já deixa explícito que aqueles dois nunca se combinam.
 None = irrestrito (bypass -- vê todos os projetos, comportamento de hoje).
 frozenset[str] (mesmo vazio) = só esses project_ids.
 
+Além do cadastro manual em project_access, quem já está registrado como
+e-mail responsável do orçamento de um projeto (budgets/{project_id}.emails,
+aba Orçamentos) ganha acesso automaticamente àquele projeto -- é o cadastro
+de "nível mais alto"; as 2ª/3ª vias de cadastro (por pessoa/por grupo, que
+gravam em project_access) só ACRESCENTAM em cima disso, nunca substituem.
+
 Fail-closed em toda camada: erro nunca amplia o que o caller vê --
-list_project_access_or_empty (firestore.py) já devolve [] em erro, e
-workspace_directory.is_group_member já devolve False em erro."""
+list_project_access_or_empty/list_budgets_or_empty (firestore.py) já devolvem
+[] em erro, e workspace_directory.is_group_member já devolve False em erro."""
 
 from __future__ import annotations
 
@@ -68,6 +74,26 @@ def _compute_authorized_project_ids(email: str) -> frozenset[str] | None:
             direct.add(pid)
         for g in r.get("groups", []):
             groups_to_projects.setdefault(g.lower(), []).append(pid)
+
+    # Baseline automática: e-mail responsável do orçamento de 1 projeto (não
+    # do orçamento da conta inteira, _account, que não mapeia pra 1 projeto
+    # só). budgets.emails não distingue pessoa de grupo -- é o mesmo campo
+    # pra ambos -- então cada endereço entra nas duas checagens: direta
+    # (compara com o e-mail do caller) e de grupo (is_group_member, que só dá
+    # match de verdade se o endereço for mesmo um grupo; pra e-mail de pessoa
+    # devolve False, sem ampliar acesso indevido).
+    for b in fsdb.list_budgets_or_empty():
+        pid = b.get("scope")
+        if not pid or pid == fsdb.ACCOUNT_SCOPE:
+            continue
+        for addr in b.get("emails", []):
+            addr = addr.strip().lower()
+            if not addr:
+                continue
+            if addr == email:
+                direct.add(pid)
+            else:
+                groups_to_projects.setdefault(addr, []).append(pid)
 
     # dedup por GRUPO DISTINTO antes de checar membership -- evita 1 chamada
     # de Directory API por PROJETO (N+1); custa no máximo 1 chamada por

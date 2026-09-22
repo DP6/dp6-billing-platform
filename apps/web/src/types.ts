@@ -222,6 +222,10 @@ export interface ProjectAccess {
   project_id: string;
   emails: string[];
   groups: string[];
+  // Herdado do orçamento do projeto (budgets.emails) -- só leitura aqui,
+  // edita-se via /adm/budgets. Quem já está aqui não precisa ser recadastrado
+  // em "por pessoa"/"por grupo".
+  budget_emails: string[];
   updated_at: string | null;
   updated_by: string | null;
 }
