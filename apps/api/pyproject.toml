@@ -14,6 +14,11 @@ dependencies = [
   "google-cloud-firestore>=2.19",
   "google-auth>=2.34",
   "matplotlib>=3.9",
+  # login OAuth (por cima do IAP, ver oauth_session.py)
+  "authlib>=1.3",
+  "python-jose[cryptography]>=3.3",
+  "google-cloud-secret-manager>=2.20",
+  "requests>=2.32",
 ]
 
 [dependency-groups]

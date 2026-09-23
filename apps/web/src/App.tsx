@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, NavLink, Route, Routes, useLocation, useSearchParams } from "react-router-dom";
-import { useApi } from "./lib/api";
+import { apiPost, useApi } from "./lib/api";
 import { relativeToNow } from "./lib/format";
 import {
   type Filters,
@@ -158,6 +158,21 @@ function TopBar() {
         }}
       >
         {theme === "dark" ? "☀" : "☾"}
+      </button>
+      <button
+        type="button"
+        onClick={() => apiPost("/auth/logout").finally(() => (window.location.href = "/login"))}
+        style={{
+          padding: "6px 12px",
+          background: "transparent",
+          border: "1px solid #4a4a44",
+          borderRadius: "var(--radius)",
+          cursor: "pointer",
+          color: "#f2f1ec",
+          fontSize: 12.5,
+        }}
+      >
+        Sair
       </button>
     </header>
   );

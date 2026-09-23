@@ -26,6 +26,14 @@ locals {
     BILLING_API_SCHEDULER_SA_EMAIL          = google_service_account.weekly_report_scheduler.email
     # Mesmo formato confirmado em dev/main.tf, só troca o nome do serviço.
     BILLING_API_IAP_AUDIENCE = "/projects/${var.project_number}/locations/${var.region}/services/billing-platform-api-${local.env}"
+
+    # login OAuth (oauth_session.py) -- URL do proprio servico (formato
+    # estavel do Cloud Run v2) pra montar o redirect_uri. Confirmar contra
+    # `gcloud run services describe billing-platform-api-prod --format='value(status.url)'`
+    # depois do 1o deploy; se divergir, so ajustar esta linha. Tambem chega
+    # (sem uso) no deploy interno do scheduler.tf, que reaproveita este
+    # local -- inofensivo, aquele deploy nao serve login pra ninguem.
+    BILLING_API_OAUTH_REDIRECT_BASE_URL = "https://billing-platform-api-${local.env}-${var.project_number}.${var.region}.run.app"
   }
 }
 
@@ -51,7 +59,8 @@ module "api" {
   image           = var.api_image
   allowed_members = var.iap_allowed_members
 
-  runtime_project_roles = ["roles/bigquery.jobUser"]
+  # secretAccessor: login OAuth (oauth_session.py) le client id/secret/JWT/allowlist do Secret Manager
+  runtime_project_roles = ["roles/bigquery.jobUser", "roles/secretmanager.secretAccessor"]
 
   enable_self_impersonation = true
   enable_firestore          = true
