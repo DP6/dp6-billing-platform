@@ -6,7 +6,7 @@ export async function apiGet<T>(path: string, params?: Record<string, string | u
   const qs = new URLSearchParams();
   for (const [k, v] of Object.entries(params ?? {})) if (v != null && v !== "") qs.set(k, v);
   const url = `${BASE}/api${path}${qs.toString() ? `?${qs}` : ""}`;
-  const res = await fetch(url, { headers: { Accept: "application/json" } });
+  const res = await fetch(url, { headers: { Accept: "application/json" }, credentials: "include" });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body?.error?.message ?? `${res.status} ${res.statusText}`);
@@ -18,6 +18,7 @@ async function apiMutate<T>(method: "POST" | "PUT" | "DELETE", path: string, bod
   const res = await fetch(`${BASE}/api${path}`, {
     method,
     headers: { "Content-Type": "application/json", Accept: "application/json" },
+    credentials: "include",
     body: body != null ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) {
