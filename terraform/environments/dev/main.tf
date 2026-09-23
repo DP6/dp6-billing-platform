@@ -31,7 +31,8 @@ module "api" {
   allowed_members = var.iap_allowed_members
 
   # a API le so o dataset reporting -> jobUser no projeto + dataViewer no dataset (via data_stack)
-  runtime_project_roles = ["roles/bigquery.jobUser"]
+  # secretAccessor: login OAuth (oauth_session.py) le client id/secret/JWT/allowlist do Secret Manager
+  runtime_project_roles = ["roles/bigquery.jobUser", "roles/secretmanager.secretAccessor"]
 
   # aba ADM: Directory API (checar grupo gcp-dp6-gti@) precisa dos dois --
   # Gmail send (gmail.send) so na SA de PROD, ver prod/main.tf.
@@ -59,6 +60,12 @@ module "api" {
     # (nao da pra usar output do proprio modulo como input dele mesmo) -- o
     # nome eh literal, "${var.name}-${var.env}" do modulo app_service.
     BILLING_API_IAP_AUDIENCE = "/projects/${var.project_number}/locations/${var.region}/services/billing-platform-api-${local.env}"
+
+    # login OAuth (oauth_session.py) -- URL do proprio servico (formato
+    # estavel do Cloud Run v2) pra montar o redirect_uri. Confirmar contra
+    # `gcloud run services describe billing-platform-api-dev --format='value(status.url)'`
+    # depois do 1o deploy; se divergir, so ajustar esta linha.
+    BILLING_API_OAUTH_REDIRECT_BASE_URL = "https://billing-platform-api-${local.env}-${var.project_number}.${var.region}.run.app"
   }
 }
 

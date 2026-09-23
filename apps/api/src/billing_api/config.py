@@ -103,6 +103,17 @@ class Settings(BaseSettings):
     # caller vira admin (bootstrap email), sem checar JWT/grupo nenhum.
     dev_force_admin: bool = False
 
+    # ---- login OAuth (Google), por cima do IAP -- ver oauth_session.py ----
+    # (reaproveita o `environment` acima pra escolher os secrets _DEV/_PROD)
+
+    # URL base do proprio servico (sem trailing slash), usada pra montar o
+    # redirect_uri do OAuth (`{base}/api/auth/callback`). Terraform injeta a
+    # URL real do Cloud Run; vazio em dev local cai no fallback
+    # http://localhost:8080 (ver oauth_session.build_redirect_uri) -- precisa
+    # ser "localhost" literal, nao 127.0.0.1: e a unica forma do Chrome tratar
+    # um cookie Secure como valido sem TLS.
+    oauth_redirect_base_url: str = ""
+
     @property
     def rpt(self) -> str:
         return f"`{self.gcp_project}.{self.reporting_dataset}`"
