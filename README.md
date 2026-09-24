@@ -11,46 +11,40 @@ billing export em vez da view de um único projeto) e o grão (ganha `project_id
 como dimensão, já que agora há múltiplos projetos nos dados). Ver o plano completo:
 `~/.claude/plans/preciso-criar-uma-vers-o-encapsulated-willow.md`.
 
-## Estado (2026-09-12)
+## Estado (2026-09-24)
 
-**Código e repositório prontos; nada aplicado no GCP ainda.**
+**Em produção, com pipeline e apps rodando de verdade** — o skeleton dos primeiros dias já foi
+superado; ver `CHANGELOG.md` para a lista completa de fases entregues desde então.
 
-Já feito:
+Já feito (além do que já estava descrito na cópia inicial):
 
-- Estrutura de diretórios e todos os arquivos copiados e renomeados (datasets, SAs, secrets,
-  nome do repo Dataform, imagem/serviço Cloud Run, tag `billing_platform`).
-- Origem do dado repontada para a tabela bruta
-  `dp6-billing-voucher.billing_export.gcp_billing_export_resource_v1_008012_F93445_DFD798`
-  (declaration `definitions/sources/billing_export_resource.sqlx`).
-- `docs/adr/ADR-003-acesso-direto-tabela-bruta.md` reescrita documentando a divergência do
-  padrão de authorized view do repo-irmão.
-- **Grão com projeto**: `project_id`/`project_name` no fato, no rollup mensal, na view de
-  anomalia (z-score por projeto × serviço), na assertion de reconciliação e em 6 das 13 views
-  de `reporting/`. As outras 7 ficaram de fora **de propósito** — são cards/gauges de 1 linha
-  ou catálogo global de SKU; o motivo está na `description` de cada `.sqlx`.
-- **Verificado**: `dataform compile` → 23 ações, sem erro. `terraform fmt -check -recursive`
-  limpo e `terraform validate` OK em `bootstrap`, `environments/dev` e `environments/prod`.
-- **GitHub**: repo criado (público), branches `develop` (default) e `main`, Environments
-  `dev-deploy` (branch `develop`) e `prod-deploy` (branch `main`) com reviewers obrigatórios e
-  `can_admins_bypass=false`. PR #1 aberta com todo o conteúdo, mirando `develop`.
+- **Bootstrap aplicado** no GCP — SAs, WIF, bucket de state e repo Dataform existem; fluxo
+  `develop → main` exercitado dezenas de vezes (72 PRs mergeadas até aqui), com promoção
+  automática `develop→main` mantendo os dois em sincronia.
+- **Acesso à origem concedido** — o pipeline lê a tabela bruta de faturamento normalmente
+  (backfill histórico e cargas incrementais rodando); fix posterior de `dataOwner` na SA do
+  Dataform (`6c794d9`) resolvido.
+- **Fase 4 — apps**: filtro por projeto implementado na UI (`ProjectFilter`/`project_id` em
+  `VisaoGeral.tsx`, `App.tsx`, `Adm.tsx`), textos e fixtures adaptados, filtros persistentes
+  entre telas + drill-down por clique em gráfico, forecast com banda de confiança real,
+  importação de orçamentos nativos do GCP Billing Budgets.
+- **Login OAuth estilo `polaris-atlas`** implementado por cima do IAP (gate de sessão
+  desacoplado da autorização, que continua vindo da identidade do IAP) + acesso por projeto
+  com 3 vias de cadastro (projeto/pessoa/grupo) e admin autogerenciável.
+- **Backfill de custo histórico** jan–jun/2026 carregado via CSV do self billing voucher
+  (`docs/adr/ADR-010-backfill-historico-self-billing-csv.md`), unido ao fato via `UNION ALL`.
+- Relatório semanal por e-mail com custo histórico total e ritmo do mês, visual com
+  cards/gráficos.
 
-Pendente:
+Pendente de verdade (o resto da lista antiga já foi resolvido):
 
-- **Bootstrap no GCP** — `terraform apply` em `terraform/bootstrap/` nunca rodou. Enquanto não
-  rodar, não existem as SAs nem o WIF, e os checks `plan (dev)`/`plan (prod)` da PR falham no
-  passo de auth (é esperado, não é bug de código). Depois do apply: rodar o
-  `github_secrets_cmd` para setar os 4 secrets de WIF no repo.
-- **Acesso à origem** — grant da TI no dataset `billing_export` para
-  `sa-billing-platform-dataform@dp6-ci-polaris` (texto pronto em
-  `terraform/bootstrap/outputs.tf` → `external_access_request`). A SA precisa existir (ou seja,
-  bootstrap aplicado) para o grant valer.
-- **Fase 1 — validação**: `validation/*.sql` ainda não foram rodadas contra a tabela nova.
-  Os parâmetros de negócio em `includes/constants.js` (orçamento, limiares de anomalia,
-  `DEPLOY_COUNT_PER_MONTH`) estão marcados como herdados do repo-irmão e **não valem** na
-  escala da conta inteira — ver ADR-005.
-- **Fase 4 — apps**: `api`/`web` ainda têm textos e fixtures do `polaris-cost-model` e não
-  expõem filtro por projeto na UI, apesar das views já terem a dimensão.
-- **Fluxo `develop → main`** ainda não exercitado ponta a ponta.
+- **Fase 1 — validação em escala de conta inteira**: `validation/RESULTADOS.md` ainda reflete
+  a rodada de 2026-09-09 **filtrada por um único projeto** (`dp6-ci-polaris`), herdada do
+  `polaris-cost-model` — nunca foi refeita contra a tabela bruta sem filtro. Por isso os
+  parâmetros de negócio em `includes/constants.js` (`ANOMALY_Z`, `MONTHLY_BUDGET_BRL`,
+  `CUD_REEVAL_THRESHOLD_BRL`, `DEPLOY_COUNT_PER_MONTH`) continuam marcados com TODO/herdados e
+  **não calibrados** para a escala da conta inteira — ver ADR-005 (ainda com status "NÃO
+  válido aqui").
 - Rulesets/branch protection: não configurados (o `polaris-cost-model` também não tem).
 
 ## Dataform — rodar local

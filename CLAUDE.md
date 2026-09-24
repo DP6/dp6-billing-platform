@@ -5,10 +5,13 @@ cobrindo **toda a conta de faturamento** em vez de um único projeto. Roda no me
 (`dp6-ci-polaris`) como repo independente. Billing account `008012-F93445-DFD798` (BRL),
 **todos os projetos** (não só `dp6-ci-polaris`).
 
-**Estado atual: esqueleto recém-copiado, nada validado/aplicado ainda.** Ver `README.md` §Estado
-e o plano `~/.claude/plans/preciso-criar-uma-vers-o-encapsulated-willow.md` antes de assumir que
-qualquer fase abaixo está "pronta" — a árvore/convenções foram herdadas do repo-irmão, mas o
-conteúdo (validação, grão com `project_id`, docs, apps) ainda precisa da adaptação descrita lá.
+**Estado atual: em produção** — bootstrap aplicado, apps rodando em dev/prod, 72 PRs mergeadas
+desde o fork inicial. Ver `README.md` §Estado (2026-09-24) e `CHANGELOG.md` para o histórico de
+fases entregues. O único item de fundo ainda genuinamente pendente é a **Fase 1 — validação dos
+parâmetros de negócio na escala da conta inteira** (`includes/constants.js` tem TODOs, ADR-005
+continua "não válido aqui"); não assumir que os demais itens do plano original
+(`~/.claude/plans/preciso-criar-uma-vers-o-encapsulated-willow.md`) ainda estão em aberto sem
+conferir — a maioria já foi feita.
 
 ## Propósito
 
