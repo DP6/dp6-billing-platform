@@ -2,6 +2,25 @@
 
 Ler ao iniciar qualquer sessão neste repo. Objetivo: retomar sem perder contexto.
 
+## 2026-09-24
+
+Sessão só de auditoria/documentação — nenhuma mudança de código. `README.md`, `CLAUDE.md` e
+esta entrada estavam **desatualizados desde 2026-09-12**, descrevendo o repo como "esqueleto
+recém-copiado, nada aplicado", enquanto o histórico real (72 PRs mergeadas, `develop`/`main`
+sincronizados, sem PR/issue aberta no GitHub) mostrava bootstrap aplicado, auth em produção,
+budgets do GCP importados, forecast, drill-down, backfill histórico e login OAuth já entregues.
+Docs corrigidos para refletir isso — ver `README.md` §Estado (2026-09-24).
+
+**Único pendente real confirmado**: Fase 1 — validação dos parâmetros de negócio
+(`includes/constants.js`) na escala da conta inteira. `validation/RESULTADOS.md` ainda é a
+rodada de 2026-09-09 filtrada por `dp6-ci-polaris` (herdada do `polaris-cost-model`), nunca
+refeita sem o filtro de projeto. ADR-005 segue com status "não válido aqui".
+
+**Achado à parte, não resolvido nesta sessão**: a pasta local tem 4 worktrees git registrados
+(`dp6-billing-platform` + `-acesso-projeto`/`-drilldown`/`-forecast-fix`), todos em branches já
+100% mergeadas em `develop` — trabalho concluído, candidatos a `git worktree remove`. Um deles
+(`-acesso-projeto`) tem uma edição não commitada em `SESSIONLOG.md` local.
+
 ## 2026-09-12
 
 Repo criado por cópia mecânica do `polaris-cost-model` (ver `CHANGELOG.md`) e já publicado em
