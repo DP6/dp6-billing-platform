@@ -1,13 +1,17 @@
 # Design system — apps/web
 
-Espelha `atlas/apps/frontend/src/index.css` + `atlas/docs/frontend/{design-system,ui-ux-rules}.md`.
-`dp6-billing-platform` é standalone (ADR-001) — **espelha, não importa**. Contrato completo:
-`specs/004-ux-dashboards.md` §3.
+Fonte canônica da iniciativa: `~/ci-polaris/DP6-Design-System.md`, resolvida pra este repo via
+`~/ci-polaris/MAPA-DE-TOKENS.md` (o que fazer com token sem equivalente dos dois lados,
+conflitos já identificados) — ver `docs/adr/ADR-011-fonte-design-system-ci-polaris.md`.
+`dp6-billing-platform` é standalone (ADR-001) — **deriva da fonte canônica, não importa código
+de outro repo**. Contrato completo: `specs/004-ux-dashboards.md` §3.
 
 ## Regra de sincronização
 
 Nenhum token muda de valor em `src/index.css` sem este arquivo ser atualizado no mesmo PR.
-`src/index.css` é a fonte de verdade dos valores.
+`src/index.css` é a fonte de verdade dos *valores* deste repo; mudança futura de token deve
+consultar `~/ci-polaris/MAPA-DE-TOKENS.md` antes de decidir valor, não herdar de outro repo em
+silêncio.
 
 ## Tokens (`src/index.css`)
 

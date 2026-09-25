@@ -26,3 +26,11 @@ Isolamento por convenção de nome:
 - `dev` pode ser aplicado isolado (só `data_stack`) para validar o pipeline antes dos apps.
 - Duplica ~7 arquivos `.tf` por ambiente (diferença real: `local.env`, `backend prefix`,
   `git_commitish`) — aceito pela clareza (ADR-0003 do atlas).
+
+## Atualização (2026-09-24)
+
+Esta convenção foi extraída para o documento canônico
+`~/ci-polaris/docs/deploy-environments.md`, já que o mesmo texto estava duplicado
+verbatim em `polaris-cost-model/docs/adr/ADR-007-dev-prod-por-diretorio.md` e no `polaris-atlas`.
+Este ADR permanece como registro histórico da decisão; mudança futura na convenção deve editar
+o documento canônico, não este arquivo.
